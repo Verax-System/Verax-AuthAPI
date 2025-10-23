@@ -1,12 +1,16 @@
 # auth_api/app/models/user.py
 from sqlalchemy import String, DateTime, func, Boolean, Integer, JSON # Importar JSON genérico
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship # Importar relationship
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List # Importar List
+
 # Remover importação específica do postgres
 # from sqlalchemy.dialects.postgresql import JSONB
 
 from app.db.base import Base
+# Importar o novo modelo para a relação
+from app.models.mfa_recovery_code import MFARecoveryCode # type: ignore
+
 
 class User(Base):
     __tablename__ = "users"
@@ -40,3 +44,10 @@ class User(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
+    
+    # --- NOVA RELAÇÃO ---
+    recovery_codes: Mapped[List["MFARecoveryCode"]] = relationship(
+        back_populates="user", 
+        cascade="all, delete-orphan" # Se o User for apagado, apaga os códigos
+    )
+    # --- FIM NOVA RELAÇÃO ---

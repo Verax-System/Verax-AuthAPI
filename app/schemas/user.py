@@ -1,6 +1,6 @@
 # auth_api/app/schemas/user.py
 from pydantic import BaseModel, EmailStr, Field, validator, field_validator
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List # Importar List
 from datetime import datetime
 import re
 
@@ -70,12 +70,21 @@ class MFAEnableResponse(BaseModel):
     """Resposta ao iniciar a habilitação do MFA."""
     # otp_secret: str # REMOVIDO por segurança - será guardado temporariamente
     otp_uri: str    # A URI para gerar o QR Code
-    qr_code_base64: str # A imagem do QR Code em base64 [Image of a QR code]
+    qr_code_base64: str # A imagem do QR Code em base64 
+
+
 
 class MFAConfirmRequest(BaseModel):
     """Requisição para confirmar a habilitação do MFA."""
     otp_code: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$")
     # O segredo não é mais enviado pelo cliente
+
+# --- NOVO SCHEMA DE RESPOSTA ---
+class MFAConfirmResponse(BaseModel):
+    """Resposta ao confirmar MFA com sucesso. Inclui os códigos de recuperação."""
+    user: User
+    recovery_codes: List[str] = Field(..., description="Guarde estes códigos! Esta é a única vez que serão mostrados.")
+# --- FIM NOVO SCHEMA ---
 
 class MFADisableRequest(BaseModel):
     """Requisição para desabilitar o MFA."""
@@ -85,5 +94,12 @@ class MFAVerifyRequest(BaseModel):
     """Requisição para verificar o código MFA durante o login."""
     mfa_challenge_token: str # Token temporário recebido na etapa anterior
     otp_code: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+# --- NOVO SCHEMA DE REQUISIÇÃO ---
+class MFARecoveryRequest(BaseModel):
+    """Requisição para usar um código de recuperação durante o login."""
+    mfa_challenge_token: str # Token temporário recebido na etapa anterior
+    recovery_code: str = Field(..., description="Um dos códigos de recuperação de uso único (ex: abc-123)")
+# --- FIM NOVO SCHEMA ---
 
 # --- FIM NOVOS SCHEMAS MFA ---

@@ -1,7 +1,7 @@
 # auth_api/app/crud/crud_user.py
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Tuple # Importar List e Tuple
 import hashlib
 import secrets
 from app.crud.base import CRUDBase
@@ -13,6 +13,9 @@ from app.core.security import ( # Importar funções OTP
     verify_otp_code # Adicionar verify_otp_code
 )
 from app.crud import crud_refresh_token
+# --- IMPORTAR O NOVO CRUD E FUNÇÕES ---
+from app.crud import crud_mfa_recovery_code
+# --- FIM IMPORT ---
 from app.core.config import settings
 from loguru import logger
 from app.core.exceptions import AccountLockedException
@@ -109,43 +112,49 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
     async def set_pending_otp_secret(self, db: AsyncSession, *, user: User, otp_secret: str) -> User:
         """Salva o segredo OTP temporariamente antes da confirmação."""
         if user.is_mfa_enabled:
-             # Se MFA já está ativo, não permite iniciar o processo de novo
              raise ValueError("MFA já está habilitado.")
-        # Salva o novo segredo no campo otp_secret, mas NÃO ativa is_mfa_enabled ainda
         user.otp_secret = otp_secret
         db.add(user)
         await db.commit()
         await db.refresh(user)
         return user
 
-    async def confirm_mfa_enable(self, db: AsyncSession, *, user: User, otp_code: str) -> User | None:
+    async def confirm_mfa_enable(
+        self, db: AsyncSession, *, user: User, otp_code: str
+    ) -> Tuple[User, List[str]] | None: # MODIFICADO: Retorna (User, List[str]) ou None
         """
-        Verifica o código OTP usando o segredo PENDENTE e, se válido, ativa o MFA.
+        Verifica o código OTP usando o segredo PENDENTE e, se válido, 
+        ativa o MFA e gera os códigos de recuperação.
         """
-        # Se MFA já está ativo OU não há segredo pendente, algo está errado.
         if user.is_mfa_enabled or not user.otp_secret:
             logger.warning(f"Tentativa inválida de confirmar MFA para user ID {user.id}. Estado: enabled={user.is_mfa_enabled}, secret_exists={bool(user.otp_secret)}")
-            return None # Ou levantar um erro específico
+            return None
 
-        # Verifica o código usando o segredo que está no campo (pendente)
         if verify_otp_code(secret=user.otp_secret, code=otp_code):
             user.is_mfa_enabled = True # ATIVA O MFA
             db.add(user)
-            await db.commit()
+            
+            # --- GERAR CÓDIGOS DE RECUPERAÇÃO ---
+            # Esta função já apaga os antigos e faz commit()
+            plain_recovery_codes = await crud_mfa_recovery_code.create_recovery_codes(
+                db=db, user=user
+            )
+            # --- FIM GERAR CÓDIGOS ---
+            
+            # Não precisamos de db.commit() aqui pois create_recovery_codes já o fez
             await db.refresh(user)
             logger.info(f"MFA habilitado e confirmado com sucesso para usuário ID: {user.id}")
-            return user
+            
+            # Retorna o utilizador e os códigos em texto simples
+            return user, plain_recovery_codes 
         else:
-            # Código inválido. Limpar segredo pendente? Opcional.
-            # user.otp_secret = None # Se limpar, usuário precisa recomeçar /enable
-            # db.add(user)
-            # await db.commit()
             logger.warning(f"Tentativa falha de confirmar MFA para usuário ID: {user.id}. Código OTP inválido.")
             return None # Código inválido
 
     async def disable_mfa(self, db: AsyncSession, *, user: User, otp_code: str) -> User | None:
         """
-        Verifica o código OTP atual e, se válido, desabilita o MFA para o usuário.
+        Verifica o código OTP atual e, se válido, desabilita o MFA 
+        e apaga todos os códigos de recuperação.
         """
         if not user.is_mfa_enabled or not user.otp_secret:
             return user # Já está inativo
@@ -154,9 +163,16 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             user.otp_secret = None # Remove o segredo
             user.is_mfa_enabled = False
             db.add(user)
-            await db.commit()
+            
+            # --- APAGAR CÓDIGOS DE RECUPERAÇÃO ---
+            rows_deleted = await crud_mfa_recovery_code.delete_all_codes_for_user(
+                db=db, user_id=user.id
+            )
+            logger.info(f"MFA desabilitado. Apagados {rows_deleted} códigos de recuperação para user ID {user.id}.")
+            # --- FIM APAGAR CÓDIGOS ---
+            
+            # delete_all_codes_for_user já fez commit
             await db.refresh(user)
-            logger.info(f"MFA desabilitado com sucesso para usuário ID: {user.id}")
             return user
         else:
             logger.warning(f"Tentativa falha de desabilitar MFA para usuário ID: {user.id}. Código OTP inválido.")

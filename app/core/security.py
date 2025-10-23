@@ -14,13 +14,12 @@ import io
 import base64
 # --- FIM NOVOS IMPORTS ---
 
-# --- IMPORT DO LOGGER REMOVIDO ---
-# from loguru import logger
-# --- FIM IMPORT ---
+# Importar logger (removido na limpeza anterior, mas útil)
+from loguru import logger
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# ... (verify_password, get_password_hash) ...
+# --- VERIFICAÇÃO E HASH (EXISTENTES) ---
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
         # Limita o tamanho da senha ANTES de passar para o bcrypt (evita erros > 72 bytes)
@@ -34,6 +33,19 @@ def get_password_hash(password: str) -> str:
     # Limita o tamanho da senha ANTES de passar para o bcrypt
     password_bytes = password.encode('utf-8')[:72]
     return pwd_context.hash(password_bytes)
+    
+# --- NOVAS FUNÇÕES HELPER PARA RECOVERY CODES ---
+# Reutilizar as funções de senha para os códigos de recuperação
+def verify_recovery_code(plain_code: str, hashed_code: str) -> bool:
+    # Códigos de recuperação são mais curtos, não precisam do limite de 72 bytes
+    try:
+        return pwd_context.verify(plain_code, hashed_code)
+    except Exception:
+        return False
+
+def hash_recovery_code(plain_code: str) -> str:
+    return pwd_context.hash(plain_code)
+# --- FIM NOVAS FUNÇÕES ---
 
 
 # --- Funções JWT (com Claims OIDC) ---
@@ -54,9 +66,6 @@ def create_access_token(
         "token_type": "access",
         "email": user.email,
         "email_verified": user.is_verified,
-        # NOVO: Authentication Methods Reference (OIDC claim)
-        # Se MFA está desabilitado OU se MFA está habilitado E foi passado nesta sessão -> ["pwd", "mfa"]
-        # Caso contrário (MFA habilitado mas não passado) -> ["pwd"]
         "amr": ["pwd", "mfa"] if user.is_mfa_enabled and mfa_passed else ["pwd"],
         **({"name": user.full_name} if user.full_name else {})
     }
@@ -79,14 +88,12 @@ def decode_access_token(token: str) -> Dict | None:
             settings.SECRET_KEY,
             algorithms=[settings.ALGORITHM],
             audience=settings.JWT_AUDIENCE,
-            issuer=settings.JWT_ISSUER, # Especifica o emissor esperado
+            issuer=settings.JWT_ISSUER, 
             options={"verify_iss": True, "verify_aud": True}
         )
         return payload
     except JWTError as e:
-        # --- LOG DE ERRO REMOVIDO ---
-        # logger.error(f"Erro ao decodificar Access Token: {e}")
-        # --- FIM LOG DE ERRO ---
+        logger.warning(f"Falha ao decodificar Access Token: {e}") # Log útil
         return None
 
 def create_refresh_token(data: Dict[str, Any]) -> tuple[str, datetime]:
@@ -107,16 +114,14 @@ def decode_refresh_token(token: str) -> Dict | None:
             token,
             settings.REFRESH_SECRET_KEY,
             algorithms=[settings.ALGORITHM],
-            issuer=settings.JWT_ISSUER, # Especifica o emissor esperado
+            issuer=settings.JWT_ISSUER, 
             options={"verify_iss": True, "verify_aud": False}
         )
         if payload.get("token_type") != "refresh":
              return None
         return payload
     except JWTError as e:
-        # --- LOG DE ERRO REMOVIDO ---
-        # logger.error(f"Erro ao decodificar Refresh Token: {e}")
-        # --- FIM LOG DE ERRO ---
+        logger.warning(f"Falha ao decodificar Refresh Token: {e}")
         return None
 
 # ... (create_password_reset_token, decode_password_reset_token) ...
@@ -128,7 +133,7 @@ def create_password_reset_token(email: str) -> tuple[str, datetime]:
         "iss": settings.JWT_ISSUER,
         "aud": settings.JWT_AUDIENCE,
         "exp": expire,
-        "nfs": datetime.now(timezone.utc),
+        "nbf": datetime.now(timezone.utc),
         "sub": email,
         "token_type": "password_reset"
     }
@@ -143,16 +148,14 @@ def decode_password_reset_token(token: str) -> Dict | None:
             reset_secret,
             algorithms=[settings.ALGORITHM],
             audience=settings.JWT_AUDIENCE,
-            issuer=settings.JWT_ISSUER, # Especifica o emissor esperado
+            issuer=settings.JWT_ISSUER, 
             options={"verify_iss": True, "verify_aud": True}
         )
         if payload.get("token_type") != "password_reset" or "sub" not in payload:
              return None
         return payload
     except JWTError as e:
-        # --- LOG DE ERRO REMOVIDO ---
-        # logger.error(f"Erro ao decodificar Password Reset Token: {e}")
-        # --- FIM LOG DE ERRO ---
+        logger.warning(f"Falha ao decodificar Password Reset Token: {e}")
         return None
 
 # --- NOVAS FUNÇÕES MFA/OTP ---
@@ -165,9 +168,7 @@ def generate_otp_uri(secret: str, email: str, issuer_name: str) -> str:
     """
     Gera uma URI 'otpauth://' que pode ser usada por apps autenticadores.
     """
-    # Garante que o nome do issuer não tenha caracteres problemáticos para URI
     safe_issuer_name = issuer_name.replace(":", "")
-    # Usa url_encode=True para garantir que o issuer_name seja codificado corretamente se contiver espaços, etc.
     return pyotp.totp.TOTP(secret).provisioning_uri(
         name=email,
         issuer_name=safe_issuer_name
@@ -178,15 +179,13 @@ def verify_otp_code(secret: str, code: str) -> bool:
     Verifica se um código OTP é válido para o segredo fornecido.
     Permite uma pequena janela de tempo para sincronização.
     """
-    if not secret: # Adiciona verificação se o segredo é nulo/Vazio
+    if not secret: 
         return False
     totp = pyotp.TOTP(secret)
-    # Verifica o código atual e o anterior/seguinte (janela de +/- 30s = 1 * 30s)
     return totp.verify(code, valid_window=1)
 
 def generate_qr_code_base64(otp_uri: str) -> str:
     """Gera um QR Code a partir da URI OTP e retorna como imagem base64."""
-    # Cria o QR code
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -195,18 +194,10 @@ def generate_qr_code_base64(otp_uri: str) -> str:
     )
     qr.add_data(otp_uri)
     qr.make(fit=True)
-
-    # Cria a imagem a partir do QR code
     img = qr.make_image(fill_color="black", back_color="white")
-
-    # Salva a imagem em memória como PNG
     buffered = io.BytesIO()
     img.save(buffered, format="PNG")
-
-    # Converte para base64
     img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-
-    # Retorna no formato Data URI
     return f"data:image/png;base64,{img_str}"
 
 # --- FIM NOVAS FUNÇÕES ---
