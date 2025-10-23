@@ -62,10 +62,19 @@ jobs:
       # --- ETAPA DE TESTE ATUALIZADA ---
       
       - name: Run Pytest with Coverage
-        # --- ADICIONE ESTE BLOCO 'env' ---
         env:
+          # Corrige o "Module not found"
           PYTHONPATH: .
-        # --- FIM DA ADIÇÃO ---
+          
+          # --- ADICIONE ESTAS VARIÁVEIS ---
+          # Pega a URL do conftest para satisfazer a validação
+          DATABASE_URL: "sqlite+aiosqlite:///./test.db"
+          SECRET_KEY: "dummy_test_key"
+          REFRESH_SECRET_KEY: "dummy_test_refresh_key"
+          SENDGRID_API_KEY: "dummy_sendgrid"
+          EMAIL_FROM: "test@example.com"
+          INTERNAL_API_KEY: "dummy_internal_key"
+          
         run: |
           # Roda os testes, medindo a cobertura do diretório 'app'
           # Falha o build se a cobertura for menor que 80%
