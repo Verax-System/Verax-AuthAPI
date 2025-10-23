@@ -348,7 +348,7 @@ Se o código estiver correto, a API retorna `HTTP 200` com os tokens. O payload 
 ```
 
 ### Passo 6: 🛡️ Usar o JWT (Frontend -> Backend Cliente)
-O frontend envia o `access_token` final para o backend do seu E-commerce (ex: `GET /api/products`) no header `Authorization: Bearer <token>`.
+O frontend envia o `access_token` final para o backend do seu E-commerce (ex: `GET /api/products`) no header `Authorization: <token>`.
 
 O backend do seu E-commerce (VRSales) só precisa:
 
