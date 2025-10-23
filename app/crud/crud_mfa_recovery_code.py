@@ -55,7 +55,7 @@ async def delete_all_codes_for_user(db: AsyncSession, *, user_id: int) -> int:
     result: Result = await db.execute(stmt)  # Adicionar type hint para Result
     await db.commit()
     # CORRIGIDO: Acessar rowcount
-    row_count = result.rowcount
+    row_count = result.rowcount # type: ignore [attr-defined]
     return row_count if row_count is not None else 0  # rowcount pode ser None
 
 
@@ -67,7 +67,7 @@ async def get_valid_recovery_code(
     """
     stmt = select(MFARecoveryCode).where(
         MFARecoveryCode.user_id == user.id,
-        not MFARecoveryCode.is_used,  # <-- CORRIGIDO E712 (para ruff)
+        not MFARecoveryCode.is_used.is_(False),  # <-- CORRIGIDO E712 (para ruff)
     )
     result = await db.execute(stmt)
     unused_codes = result.scalars().all()

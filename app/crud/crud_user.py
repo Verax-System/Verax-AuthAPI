@@ -87,7 +87,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         stmt = select(User).where(
             User.verification_token_hash == token_hash,
             User.verification_token_expires > now,
-            not User.is_verified,  # <-- CORRIGIDO E712 (para ruff)
+            not User.is_verified.is_(False),  # <-- CORRIGIDO E712 (para ruff)
         )
         result = await db.execute(stmt)
         user = result.scalars().first()
