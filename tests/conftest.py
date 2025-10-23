@@ -50,19 +50,26 @@ async def db_session(async_engine, test_session_local):
 
 @pytest.fixture(scope="function")
 async def async_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
-    """Cria cliente httpx e sobrescreve get_db."""
+    """
+    Fixture que cria um cliente HTTP assíncrono (httpx) e
+    sobrescreve a dependência get_db para usar a sessão de teste.
+    """
 
+    # Função "falsa" que substitui o get_db original
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
-        try:
-            yield db_session
-        finally:
-            await db_session.close()
+        # Apenas entregue a sessão. Não a feche aqui.
+        # A fixture 'db_session' é quem vai fechá-la no final do teste.
+        yield db_session
 
+    # Aplicar a substituição no app FastAPI
     app.dependency_overrides[get_db] = override_get_db
 
+    # Criar e retornar o cliente
+    # (Estou assumindo que você já aplicou a correção do ASGITransport)
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
         yield client
 
+    # Limpar a substituição
     app.dependency_overrides.pop(get_db, None)
