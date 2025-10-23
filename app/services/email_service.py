@@ -1,10 +1,9 @@
 # auth_api/app/services/email_service.py
-# import asyncio # <-- REMOVIDO F401
+# import asyncio # <-- REMOVED
 import traceback
-
-# from typing import Dict, Any # <-- REMOVIDO F401
+# from typing import Dict, Any # <-- REMOVED
 from loguru import logger
-from sendgrid.helpers.mail import Mail, From, To, Content
+from sendgrid.helpers.mail import Mail, From, To, Content # type: ignore
 from app.core.config import settings
 
 # --- NOVAS IMPORTAÇÕES ---
@@ -15,9 +14,12 @@ import certifi
 # URL da API SendGrid
 SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send"
 
-
 # Helper assíncrono REESCRITO para usar HTTpx
-async def send_email_http_api(email_to: str, subject: str, html_content: str) -> bool:
+async def send_email_http_api(
+    email_to: str,
+    subject: str,
+    html_content: str
+) -> bool:
     """
     Envia um email usando HTTpx manualmente, o que lida melhor
     com certificados SSL (usando 'certifi').
@@ -31,7 +33,7 @@ async def send_email_http_api(email_to: str, subject: str, html_content: str) ->
         from_email=From(settings.EMAIL_FROM, settings.EMAIL_FROM_NAME),
         to_emails=To(email_to),
         subject=subject,
-        html_content=Content("text/html", html_content),
+        html_content=Content("text/html", html_content)
     )
     # Obter o payload JSON que a biblioteca sendgrid teria enviado
     message_payload = message.get()
@@ -39,7 +41,7 @@ async def send_email_http_api(email_to: str, subject: str, html_content: str) ->
     # 2. Preparar a requisição manual com httpx
     headers = {
         "Authorization": f"Bearer {settings.SENDGRID_API_KEY}",
-        "Content-Type": "application/json",
+        "Content-Type": "application/json"
     }
 
     try:
@@ -49,26 +51,24 @@ async def send_email_http_api(email_to: str, subject: str, html_content: str) ->
         async with httpx.AsyncClient(transport=transport) as client:
             logger.info(f"Enviando email para {email_to} via HTTpx (com certifi)...")
             response = await client.post(
-                SENDGRID_API_URL, json=message_payload, headers=headers
+                SENDGRID_API_URL,
+                json=message_payload,
+                headers=headers
             )
 
         # 4. Processar a resposta do httpx
         if 200 <= response.status_code < 300:
-            logger.info(
-                f"Email aceito para envio para {email_to} via SendGrid. Status: {response.status_code}"
-            )
+            logger.info(f"Email aceito para envio para {email_to} via SendGrid. Status: {response.status_code}")
             return True
         else:
             logger.error(f"Falha ao enviar email para {email_to} via HTTpx.")
             logger.error(f"Status: {response.status_code}")
-            logger.error(f"Body: {response.text}")  # Usar .text para httpx
+            logger.error(f"Body: {response.text}") # Usar .text para httpx
             return False
 
     except httpx.ConnectError as e:
         logger.error(f"Erro de conexão SSL/TLS ao enviar email para {email_to}: {e}")
-        logger.error(
-            "Isso confirma o problema de SSL. Verifique se 'certifi' está atualizado."
-        )
+        logger.error("Isso confirma o problema de SSL. Verifique se 'certifi' está atualizado.")
         logger.error(f"Traceback completo: {traceback.format_exc()}")
         return False
     except Exception as e:
@@ -76,11 +76,9 @@ async def send_email_http_api(email_to: str, subject: str, html_content: str) ->
         logger.error(f"Traceback completo: {traceback.format_exc()}")
         return False
 
-
 # --- O RESTANTE DO ARQUIVO (FUNÇÕES DE CONTEÚDO) PERMANECE IGUAL ---
+# ... (send_verification_email e send_password_reset_email) ...
 
-
-# --- Função específica para email de verificação ---
 async def send_verification_email(email_to: str, verification_token: str) -> bool:
     project_name = settings.EMAIL_FROM_NAME or "Sua Aplicação"
     subject = f"{project_name} - Verifique seu endereço de e-mail"
@@ -99,11 +97,11 @@ async def send_verification_email(email_to: str, verification_token: str) -> boo
     """
 
     return await send_email_http_api(
-        email_to=email_to, subject=subject, html_content=html_content
+        email_to=email_to,
+        subject=subject,
+        html_content=html_content
     )
 
-
-# --- Função específica para email de reset de senha ---
 async def send_password_reset_email(email_to: str, reset_token: str) -> bool:
     project_name = settings.EMAIL_FROM_NAME or "Sua Aplicação"
     subject = f"{project_name} - Redefinição de Senha"
@@ -124,5 +122,7 @@ async def send_password_reset_email(email_to: str, reset_token: str) -> bool:
     """
 
     return await send_email_http_api(
-        email_to=email_to, subject=subject, html_content=html_content
+        email_to=email_to,
+        subject=subject,
+        html_content=html_content
     )

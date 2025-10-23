@@ -1,22 +1,14 @@
-# auth_api/app/core/security.py
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
-from passlib.context import CryptContext
-from jose import jwt, JWTError
+from passlib.context import CryptContext # type: ignore
+from jose import jwt, JWTError # type: ignore
 from .config import settings
-
-# import secrets # <-- REMOVIDO
-# Import UserModel QUALIFICADO para evitar conflito de nome 'User'
+# import secrets # <-- REMOVED
 from app.models.user import User as UserModel
-
-# --- NOVOS IMPORTS MFA ---
-import pyotp
-import qrcode  # type: ignore
+import pyotp # type: ignore
+import qrcode # type: ignore
 import io
 import base64
-# --- FIM NOVOS IMPORTS ---
-
-# Importar logger (removido na limpeza anterior, mas útil)
 from loguru import logger
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

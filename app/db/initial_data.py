@@ -1,24 +1,20 @@
 # auth_api/app/db/initial_data.py
 import asyncio
 import logging
-import os  # Import os for the windows check
+import os # Import os for the windows check
+import sys # Importar sys para checar plataforma
 
 # --- MOVIDOS PARA O TOPO E402 ---
 from app.db.base import Base
 from app.db.session import get_async_engine, dispose_engine
-from app.models import user  # noqa F401
-from app.models.refresh_token import RefreshToken  # noqa F401
-from app.models.mfa_recovery_code import MFARecoveryCode  # noqa F401
+from app.models import user # noqa F401
+from app.models.refresh_token import RefreshToken # noqa F401
+from app.models.mfa_recovery_code import MFARecoveryCode # noqa F401
 # --- FIM MOVIDOS ---
 
 # Configuração básica de logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-# Imports que estavam aqui movidos para o topo
-
 
 async def init_db() -> None:
     logger.info("Iniciando a recriação do banco de dados (DROP ALL / CREATE ALL)...")
@@ -35,22 +31,20 @@ async def init_db() -> None:
     logger.info("Processo de inicialização do banco de dados concluído.")
     await dispose_engine()
 
-
 async def main() -> None:
     await init_db()
 
-
 if __name__ == "__main__":
-    if os.name == "nt":
+    # Define a política de loop de eventos do asyncio (importante no Windows)
+    if sys.platform == 'win32': # Verifica se é Windows de forma mais robusta
         try:
             asyncio.get_event_loop_policy()
-        except asyncio.MissingEventLoopPolicyError:
-            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        except asyncio.MissingEventLoopPolicyError: # type: ignore [attr-defined]
+             asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy()) # type: ignore [attr-defined]
 
     try:
         asyncio.run(main())
     except Exception as e:
         logger.error(f"Ocorreu um erro durante a inicialização do banco de dados: {e}")
         import traceback
-
         logger.error(traceback.format_exc())

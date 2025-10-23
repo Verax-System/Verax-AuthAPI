@@ -62,7 +62,7 @@ class Settings(BaseSettings):
 
 try:
     # AQUI é onde o settings é criado e exportado
-    settings = Settings()
+    settings = Settings() # type: ignore [call-arg]
 except Exception as e:
     logging.error(
         f"FATAL: Erro ao carregar 'settings' a partir do .env em {ENV_FILE_PATH}: {e}"
