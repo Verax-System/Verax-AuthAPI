@@ -1,35 +1,67 @@
-# auth_api/app/schemas/token.py
-from pydantic import BaseModel
-from typing import Literal, List, Optional 
+# auth_api/app/core/config.py
+import os
+import logging
+from pydantic_settings import BaseSettings
+from pydantic import EmailStr
+from pathlib import Path
 
-class Token(BaseModel):
-    access_token: str
-    refresh_token: str
-    token_type: str
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+ENV_FILE_PATH = BASE_DIR / ".env"
 
-class TokenPayload(BaseModel):
-    sub: str | None = None
-    exp: int | None = None
-    token_type: str | None = None
-    amr: Optional[List[str]] = None # Authentication Methods Reference
+class Settings(BaseSettings):
 
-class RefreshTokenRequest(BaseModel):
-    refresh_token: str
+    # Core
+    DATABASE_URL: str
+    SECRET_KEY: str
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
-# --- Schema: Resposta MFA Obrigatório ---
-class MFARequiredResponse(BaseModel):
-    """Resposta indicando que a verificação MFA é necessária."""
-    detail: Literal["MFA verification required"] = "MFA verification required"
-    mfa_challenge_token: str # Um token temporário para a próxima etapa
+    # Refresh Token
+    REFRESH_SECRET_KEY: str
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-# --- NOVOS SCHEMAS PARA GOOGLE OAUTH ---
+    # --- Configurações de Email (SendGrid) ---
+    SENDGRID_API_KEY: str
+    EMAIL_FROM: EmailStr
+    EMAIL_FROM_NAME: str | None = "Verax AuthAPI"
 
-class GoogleLoginUrlResponse(BaseModel):
-    """Resposta que contém o URL de autorização da Google."""
-    url: str
+    # Email Links
+    VERIFICATION_URL_BASE: str = "http://localhost:8000/verify"
+    EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES: int = 60
 
-class GoogleLoginRequest(BaseModel):
-    """Requisição que o frontend envia para a API com o código da Google."""
-    code: str
-    
-# --- FIM NOVOS SCHEMAS ---
+    # Password Reset
+    RESET_PASSWORD_SECRET_KEY: str | None = None
+    RESET_PASSWORD_TOKEN_EXPIRE_MINUTES: int = 30
+    RESET_PASSWORD_URL_BASE: str = "http://localhost:8000/reset-password"
+
+    # Account Lockout
+    LOGIN_MAX_FAILED_ATTEMPTS: int = 5
+    LOGIN_LOCKOUT_MINUTES: int = 15
+
+    # Chave de API Interna
+    INTERNAL_API_KEY: str
+
+    # --- OIDC JWT Claims ---
+    JWT_ISSUER: str = "urn:verax:authapi"
+    JWT_AUDIENCE: str = "urn:verax:client"
+
+    # --- Google OAuth2 ---
+    GOOGLE_CLIENT_ID: str | None = None
+    GOOGLE_CLIENT_SECRET: str | None = None
+    # URL do SEU frontend (para produção)
+    GOOGLE_REDIRECT_URI_FRONTEND: str = "http://localhost:3000/google-callback"
+    # URL do backend (usado apenas para testes locais da API)
+    GOOGLE_REDIRECT_URI_BACKEND: str = "http://localhost:8001/api/v1/auth/google/callback"
+
+    class Config:
+        case_sensitive = True
+        env_file = ENV_FILE_PATH
+        env_file_encoding = 'utf-8'
+
+try:
+    # AQUI é onde o settings é criado e exportado
+    settings = Settings()
+except Exception as e:
+    logging.error(f"FATAL: Erro ao carregar 'settings' a partir do .env em {ENV_FILE_PATH}: {e}")
+    # Se der erro aqui, o 'settings' não será criado, causando o ImportError
+    raise e

@@ -1,6 +1,6 @@
 # auth_api/app/schemas/token.py
 from pydantic import BaseModel
-from typing import Literal, List, Optional 
+from typing import Literal, List, Optional
 
 class Token(BaseModel):
     access_token: str
@@ -28,9 +28,10 @@ class GoogleLoginUrlResponse(BaseModel):
     """Resposta que contém o URL de autorização da Google."""
     url: str
 
-# --- REMOVIDO GoogleLoginRequest ---
-# class GoogleLoginRequest(BaseModel):
-#    code: str
-# --- FIM REMOÇÃO ---
-    
+# --- ADICIONADO DE VOLTA ---
+class GoogleLoginRequest(BaseModel):
+    """Requisição que o frontend envia para a API com o código da Google."""
+    code: str
+# --- FIM ADIÇÃO ---
+
 # --- FIM NOVOS SCHEMAS ---
