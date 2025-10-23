@@ -3,11 +3,15 @@ from fastapi import Depends, HTTPException, status
 # IMPORTAR HTTPBearer e HTTPAuthorizationCredentials
 from fastapi.security import OAuth2PasswordBearer, APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
-# from typing import AsyncGenerator # <-- REMOVIDO
+# from typing import AsyncGenerator # <-- REMOVED
 import secrets # Importar secrets para comparação segura
 
 # Remover import do logger
 # from loguru import logger
+
+# --- ADDED MISSING IMPORT ---
+from app.core import security # Import the security module
+# --- END ADDED IMPORT ---
 
 # --- CORRECTION HERE: Remove AsyncSessionLocal import ---
 from app.db.session import get_db # Keep get_db import
@@ -60,6 +64,7 @@ async def get_current_user_from_token(
     # logger.debug(f"Recebido para decodificação - Scheme: '{creds.scheme}', Token: '{token}'")
     # --- FIM LOG DE DEBUG ---
 
+    # CORRECTED F821: Now security is imported
     payload = security.decode_access_token(token)
     if payload is None:
         raise credentials_exception
