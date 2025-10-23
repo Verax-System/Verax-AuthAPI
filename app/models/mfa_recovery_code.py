@@ -1,15 +1,18 @@
 # auth_api/app/models/mfa_recovery_code.py
 from sqlalchemy import String, ForeignKey, Boolean, Index
+
 # from sqlalchemy import Integer # <-- REMOVIDO F401
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 # from datetime import datetime # <-- REMOVIDO F401
-from typing import TYPE_CHECKING # <-- Adicionado para type hint
+from typing import TYPE_CHECKING  # <-- Adicionado para type hint
 
 from app.db.base import Base
 
 # Adicionado para evitar import circular para type hints
 if TYPE_CHECKING:
-    from .user import User # noqa F401
+    from .user import User  # noqa F401
+
 
 class MFARecoveryCode(Base):
     __tablename__ = "mfa_recovery_codes"

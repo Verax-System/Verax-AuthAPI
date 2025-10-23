@@ -6,13 +6,13 @@ from app.api.dependencies import get_db
 from app.crud.crud_user import user as crud_user
 from app.models.user import User
 from app.schemas.user import User as UserSchema
-import re # Para checagem de email
+import re  # Para checagem de email
 
 router = APIRouter()
 
+
 async def get_user_by_id_or_email(
-    db: AsyncSession = Depends(get_db),
-    user_id_or_email: str = Path(...)
+    db: AsyncSession = Depends(get_db), user_id_or_email: str = Path(...)
 ) -> User:
     """
     Dependência que busca um usuário pelo seu ID ou Email.
@@ -30,11 +30,10 @@ async def get_user_by_id_or_email(
         except ValueError:
             # Não é um email válido nem um ID numérico
             pass
-    
+
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Usuário não encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado"
         )
     return user
 
@@ -46,13 +45,13 @@ async def get_user_by_id_or_email(
 async def update_user_claims(
     *,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_user_by_id_or_email), # Usa a dependência helper
-    claims_in: Dict[str, Any] = Body(...) # Pega o JSON do corpo
+    user: User = Depends(get_user_by_id_or_email),  # Usa a dependência helper
+    claims_in: Dict[str, Any] = Body(...),  # Pega o JSON do corpo
 ) -> Any:
     """
     Atualiza (mescla) os claims customizados de um usuário (ex: roles, permissions).
     Este endpoint é protegido pela X-API-Key (definido no main.py).
-    
+
     Exemplo de Body:
     {
         "roles": ["admin", "user"],
@@ -60,7 +59,5 @@ async def update_user_claims(
         "store_id": 123
     }
     """
-    updated_user = await crud_user.update_custom_claims(
-        db, user=user, claims=claims_in
-    )
+    updated_user = await crud_user.update_custom_claims(db, user=user, claims=claims_in)
     return updated_user

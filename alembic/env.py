@@ -13,14 +13,16 @@ from alembic import context
 # import os # <-- REMOVIDO
 import sys
 from pathlib import Path
+
 # Sobe dois níveis (alembic/ -> raiz) e adiciona ao path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from app.db.base import Base
-from app.models import user # noqa F401
-from app.models import refresh_token # noqa F401
+from app.models import user  # noqa F401
+from app.models import refresh_token  # noqa F401
+
 # --- ADICIONAR NOVO MODELO ---
-from app.models import mfa_recovery_code # noqa F401
+from app.models import mfa_recovery_code  # noqa F401
 # --- FIM ADIÇÃO ---
 # --- Fim Importar Modelos ---
 
@@ -47,7 +49,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # add your model's MetaData object here
-target_metadata = Base.metadata # --- 4. Apontar para a Base do nosso app ---
+target_metadata = Base.metadata  # --- 4. Apontar para a Base do nosso app ---
 
 
 def run_migrations_offline() -> None:
@@ -58,7 +60,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
-        compare_type=True
+        compare_type=True,
     )
 
     with context.begin_transaction():
@@ -67,9 +69,7 @@ def run_migrations_offline() -> None:
 
 def do_run_migrations(connection: Connection) -> None:
     context.configure(
-        connection=connection,
-        target_metadata=target_metadata,
-        compare_type=True
+        connection=connection, target_metadata=target_metadata, compare_type=True
     )
 
     with context.begin_transaction():

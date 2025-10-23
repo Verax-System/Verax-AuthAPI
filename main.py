@@ -1,5 +1,5 @@
 # auth_api/main.py
-from fastapi import FastAPI, Depends # <-- Request REMOVIDO
+from fastapi import FastAPI, Depends  # <-- Request REMOVIDO
 from fastapi.middleware.cors import CORSMiddleware
 # from fastapi.responses import JSONResponse # <-- REMOVIDO
 # --- Imports de Segurança ---
@@ -12,17 +12,25 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+
 # --- Fim imports slowapi ---
 from app.db.session import dispose_engine
+
 # Importar routers
 from app.api.endpoints import auth, users, mgmt
+
 # Importar dependência de chave de API E OS NOVOS ESQUEMAS
 # E os esquemas de segurança que SÃO usados
-from app.api.dependencies import get_api_key, oauth2_scheme, bearer_scheme, api_key_scheme
+from app.api.dependencies import (
+    get_api_key,
+    oauth2_scheme,
+    bearer_scheme,
+    api_key_scheme,
+)
 
 # Importar modelos para Alembic/Base.metadata
-from app.db.base import Base # noqa
-from app.models import user, refresh_token, mfa_recovery_code # noqa
+from app.db.base import Base  # noqa
+from app.models import user, refresh_token, mfa_recovery_code  # noqa
 
 # --- REMOVER DEFINIÇÕES DE ESQUEMAS DAQUI ---
 # Elas agora são importadas de 'dependencies.py'
@@ -46,9 +54,9 @@ app = FastAPI(
             # 2. NOVO: Para os endpoints com cadeado (colar o token)
             "BearerAuth": bearer_scheme,
             # 3. Para o /mgmt
-            "APIKeyHeader": api_key_scheme
+            "APIKeyHeader": api_key_scheme,
         }
-    }
+    },
     # --- Fim OpenAPI ---
 )
 
@@ -100,6 +108,7 @@ async def shutdown_event():
     print("Shutting down: Disposing database engine...")
     await dispose_engine()
     print("Database engine disposed.")
+
 
 @app.get("/")
 def read_root():
