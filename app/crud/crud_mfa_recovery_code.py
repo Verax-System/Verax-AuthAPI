@@ -67,7 +67,8 @@ async def get_valid_recovery_code(
     """
     stmt = select(MFARecoveryCode).where(
         MFARecoveryCode.user_id == user.id,
-        not MFARecoveryCode.is_used.is_(False),  # <-- CORRIGIDO E712 (para ruff)
+        # CORREÇÃO PARA MYPY E RUFF:
+        MFARecoveryCode.is_used.is_(False),
     )
     result = await db.execute(stmt)
     unused_codes = result.scalars().all()

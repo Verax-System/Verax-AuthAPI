@@ -87,7 +87,8 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         stmt = select(User).where(
             User.verification_token_hash == token_hash,
             User.verification_token_expires > now,
-            not User.is_verified.is_(False),  # <-- CORRIGIDO E712 (para ruff)
+            # CORREÇÃO PARA MYPY E RUFF:
+            User.is_verified.is_(False),
         )
         result = await db.execute(stmt)
         user = result.scalars().first()
@@ -250,7 +251,8 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         stmt = select(User).where(
             User.reset_password_token_hash == token_hash,
             User.reset_password_token_expires > now,
-            User.is_active,  # <-- CORRIGIDO E712 (para ruff)
+            # CORREÇÃO PARA MYPY E RUFF:
+            User.is_active.is_(True),
         )
         result = await db.execute(stmt)
         return result.scalars().first()
