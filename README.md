@@ -1,379 +1,404 @@
-
 <p align="center">
-    <a href="https://github.com/SEU_USUARIO/SEU_REPOSITORIO/blob/main/LICENSE" target="_blank">
-        <img src="https://img.shields.io/github/license/SEU_USUARIO/SEU_REPOSITORIO?style=for-the-badge&color=brightgreen" alt="License">
-    </a>
-    <a href="https://github.com/SEU_USUARIO/SEU_REPOSITORIO/stargazers" target="_blank">
-        <img src="https://img.shields.io/github/stars/SEU_USUARIO/SEU_REPOSITORIO?style=for-the-badge&color=blue" alt="Stars">
-    </a>
-    <a href="https://github.com/SEU_USUARIO/SEU_REPOSITORIO/graphs/contributors" target="_blank">
-        <img src="https://img.shields.io/github/contributors/SEU_USUARIO/SEU_REPOSITORIO?style=for-the-badge&color=orange" alt="Contributors">
-    </a>
+  <img src="https://img.shields.io/badge/Python-3.10+-blue.svg?style=for-the-badge&logo=python" alt="Python Version">
+  <img src="https://img.shields.io/badge/Rust-1.60+-orange.svg?style=for-the-badge&logo=rust" alt="Rust Version">
+  <img src="https://img.shields.io/badge/FastAPI-0.119.1-teal.svg?style=for-the-badge&logo=fastapi" alt="FastAPI">
+  <img src="https://img.shields.io/badge/Axum-0.8.6-black.svg?style=for-the-badge" alt="Axum">
+  <a href="https://github.com/SEU_USUARIO/SEU_REPOSITORIO/blob/main/LICENSE" target="_blank">
+      <img src="https://img.shields.io/github/license/SEU_USUARIO/SEU_REPOSITORIO?style=for-the-badge&color=brightgreen" alt="License">
+  </a>
 </p>
 
-Um serviço de identidade agnóstico, seguro e flexível.
-Construído com FastAPI e PostgreSQL para servir como um provedor de identidade (IdP) centralizado para qualquer aplicação.
+# Verax AuthAPI
 
+Um serviço de identidade agnóstico, seguro e flexível. Construído com FastAPI e PostgreSQL para servir como um provedor de identidade (IdP) centralizado para qualquer aplicação.
 
+Este projeto agora inclui a implementação original robusta em **Python (FastAPI)**, com suporte completo a **MFA (Autenticação de Múltiplos Fatores)**, e também uma **reescrita completa em Rust (Axum)** para máxima performance.
 
+## 💡 Conceito Central: Autenticação vs. Autorização
 
+Esta API foi projetada com uma filosofia fundamental: a rigorosa separação entre **Autenticação** (provar quem você é) e **Autorização** (definir o que você pode fazer).
 
-💡 Conceito Central: Autenticação vs. Autorização
-Esta API foi projetada com uma filosofia fundamental: a rigorosa separação entre Autenticação (provar quem você é) e Autorização (definir o que você pode fazer).
+### Esta API (Auth API) cuida da Autenticação:
 
-Esta API (Auth API) cuida da Autenticação:
+* Gerencia com segurança o registro, login e dados do usuário.
+* Verifica identidades via email, reset de senha, bloqueio de conta e **MFA (TOTP)**.
+* Fornece um "cofre" de `custom_claims` (claims customizados) flexível para cada usuário.
+* Emite tokens JWT contendo Claims Padrão OIDC (`iss`, `aud`, `sub`, `email`, `amr`, etc.) para maior compatibilidade.
 
-Gerencia com segurança o registro, login e dados do usuário.
+### Sua Aplicação (ex: VR Sales) cuida da Autorização:
 
-Verifica identidades via email, reset de senha e bloqueio de conta.
-
-Fornece um "cofre" de custom_claims (claims customizados) flexível para cada usuário.
-
-Emite tokens JWT contendo Claims Padrão OIDC (iss, aud, sub, email, etc.) para maior compatibilidade.
-
-Sua Aplicação (ex: VR Sales) cuida da Autorização:
-
-Você define quais roles ou permissions existem no seu sistema.
-
-Você usa a API de Gerenciamento (/mgmt) para escrever esses dados no "cofre" custom_claims do usuário na API Auth (ex: {"roles": ["admin"], "store_id": 123}).
-
-Você solicita esses dados (scopes) durante o login para que sejam injetados no JWT, junto com os claims OIDC padrão.
-
-Você valida o JWT e interpreta os claims (padrão e customizados) para aplicar sua lógica de negócios.
+* Você define quais *roles* ou *permissions* existem no seu sistema.
+* Você usa a API de Gerenciamento (`/mgmt`) para escrever esses dados no `custom_claims` do usuário na API Auth (ex: `{"roles": ["admin"], "store_id": 123}`).
+* Você solicita esses dados (`scopes`) durante o login para que sejam injetados no JWT.
+* Sua aplicação valida o JWT e interpreta os claims (`amr`, `roles`, `store_id`) para aplicar sua lógica de negócios.
 
 Este design oferece flexibilidade total, permitindo que qualquer sistema utilize um serviço de identidade robusto enquanto mantém controle total sobre sua própria lógica de negócios e permissões.
 
-✨ Features
-✅ Gerenciamento de Identidade: Registro de usuário e recuperação de perfil.
+---
 
-✅ Fluxo de Tokens (JWT): Login com access_token e refresh_token (com rotação).
+## ✨ Features
 
-✅ Claims JWT Padrão OIDC: Tokens incluem iss, aud, sub, iat, exp, email, email_verified, name para interoperabilidade.
+### Implementação Principal (Python / FastAPI)
 
-✅ Segurança de Senha: Hashing de senha forte (Bcrypt).
+* **Gerenciamento de Identidade:** Registro de usuário e recuperação de perfil (`/users/`, `/me`).
+* **Fluxo de Tokens (JWT):** Login com `access_token` e `refresh_token` (com rotação).
+* **Claims JWT Padrão OIDC:** Tokens incluem `iss`, `aud`, `sub`, `iat`, `exp`, `email`, `email_verified`, `name` e `amr` (Authentication Methods Reference).
+* **Autenticação de Múltiplos Fatores (MFA/TOTP):**
+    * Fluxo completo para Habilitar, Confirmar e Desabilitar MFA (via Google Authenticator, Authy, etc.).
+    * Geração de QR Code (Base64) e URI `otpauth://`.
+    * Verificação MFA (2-step) no login, retornando um `mfa_challenge_token`.
+* **Segurança de Senha:** Hashing de senha forte (Bcrypt) com limite de 72 bytes.
+* **Fluxos de Email (SendGrid):**
+    * Verificação de Email para ativação de conta.
+    * Recuperação de Senha ("esqueci minha senha").
+* **Proteção de Login:**
+    * Rate Limiting (SlowAPI).
+    * Bloqueio de Conta (Account Lockout) após tentativas falhas.
+    * Teste de integração para Lockout (`test_lockout.py`).
+* **Autorização Agnóstica (Custom Claims):** Injeta `roles`, `permissions`, `store_id` ou qualquer outro dado customizado no JWT via `scope`.
+* **API de Gerenciamento (Management):** Endpoints seguros (`/mgmt`) para gerenciar `custom_claims` de usuários via `X-API-Key`.
+* **RBAC Interno:** Endpoints da própria API protegidos por roles (ex: "admin-only" para listar usuários).
+* **Migrações de Banco de Dados:** Gerenciamento de schema seguro com Alembic.
+* **Agnóstica de Banco de Dados:** Código compatível com PostgreSQL, SQLite, MySQL (requer driver async apropriado).
+* **Async:** Totalmente assíncrono (FastAPI, SQLAlchemy 2.0, AsyncPG/AioSQLite).
+* **Docker:** Suporte completo via `Dockerfile` e `docker-compose.yml`.
 
-✅ Verificação de Email: Fluxo completo de ativação de conta por email (via SendGrid).
+### Implementação Alternativa (Rust / Axum)
 
-✅ Recuperação de Senha: Fluxo seguro de "esqueci minha senha".
+* **Reescrita de Performance:** Uma reescrita da API em Rust usando Axum, SQLx e Tokio.
+* **Endpoints Implementados:** Inclui `/`, `/api/v1/users` (Registro), `/api/v1/auth/token` (Login) e `/api/v1/mgmt/users/{id}/claims`.
+* **Migrações SQLx:** Usa `sqlx-cli` para migrações (separadas do Alembic).
+* **Middleware de API Key:** Proteção da rota `/mgmt` com middleware (`X-API-Key`) em Rust, com comparação segura.
 
-✅ Proteção de Login: Rate Limiting (SlowAPI) e Bloqueio de Conta (Account Lockout).
+---
 
-✅ Autorização Agnóstica (Custom Claims): Injeta roles, permissions, store_id ou qualquer outro dado customizado no JWT via scope.
+## 🚀 Começando (Python / FastAPI)
 
-✅ API de Gerenciamento (Management): Endpoints seguros (sistema-para-sistema) para gerenciar custom_claims de usuários.
+Esta é a implementação principal e mais completa.
 
-✅ RBAC Interno: Endpoints da própria API protegidos por roles (ex: "admin-only").
+### 📋 Pré-requisitos
 
-✅ Migrações de Banco de Dados: Gerenciamento de schema seguro com Alembic (sem perda de dados).
+* Python 3.10+
+* Um servidor de banco de dados SQL rodando (ex: PostgreSQL)
+* O driver `asyncpg` (para PostgreSQL)
+* Uma conta SendGrid (API Key e Remetente Verificado)
 
-✅ Agnóstica de Banco de Dados: Código compatível com PostgreSQL, SQLite, MySQL (requer driver async apropriado).
+### 1. Instalação
 
-✅ Async: Totalmente assíncrono (FastAPI, SQLAlchemy 2.0, AsyncPG/AioSQLite/AioMySQL).
+1.  Clone o repositório:
+    ```bash
+    git clone [https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git](https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git)
+    cd SEU_REPOSITORIO
+    ```
+2.  Crie e ative um ambiente virtual:
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # (Linux/macOS)
+    .\venv\Scripts\activate   # (Windows)
+    ```
+3.  Instale as dependências:
+    ```bash
+    pip install -r requirements.txt
+    pip install -r requirements-dev.txt
+    ```
 
-🚀 Começando
-📋 Pré-requisitos
-Python 3.10+
+### 2. Configuração
 
-Um servidor de banco de dados SQL rodando (ex: PostgreSQL, MySQL) ou SQLite.
+1.  Crie um banco de dados (ex: `auth_db`).
+2.  Crie um arquivo `.env` na raiz do projeto (copie de `.env.example` se existir) e preencha as variáveis:
 
-O driver async apropriado para seu banco (ex: asyncpg para PostgreSQL, aiosqlite para SQLite, aiomysql para MySQL).
+    ```ini
+    # --- Banco de Dados ---
+    # AJUSTE com o driver async correto e suas credenciais
+    DATABASE_URL="postgresql+asyncpg://USUARIO:SENHA@localhost:5432/auth_db"
+    # Exemplo SQLite: DATABASE_URL="sqlite+aiosqlite:///./auth.db"
 
-Uma conta SendGrid:
+    # --- Chaves Secretas (use 'openssl rand -hex 32' para gerar) ---
+    SECRET_KEY="SUA_CHAVE_SECRETA_FORTE_AQUI"
+    REFRESH_SECRET_KEY="UMA_CHAVE_SECRETA_DIFERENTE_E_FORTE_AQUI"
+    ALGORITHM="HS256"
 
-Uma Chave de API (API Key) do SendGrid.
+    # --- Chave da API de Gerenciamento (use 'openssl rand -hex 64') ---
+    INTERNAL_API_KEY="sk_live_UMA_CHAVE_SECRETA_MUITO_FORTE_PARA_SISTEMAS"
 
-Um "Remetente Verificado" (Verified Sender) configurado no SendGrid.
+    # --- Configurações de Email (SendGrid) ---
+    SENDGRID_API_KEY="SG.SUA_CHAVE_API_SENDGRID_AQUI"
+    EMAIL_FROM="seu_email_verificado@sendgrid.com"
+    EMAIL_FROM_NAME="Auth API"
 
-1. Instalação
-Clone o repositório:
+    # --- URLs do SEU Frontend ---
+    VERIFICATION_URL_BASE="http://localhost:3000/verify-email"
+    RESET_PASSWORD_URL_BASE="http://localhost:3000/reset-password"
 
-Bash
+    # --- Configurações de Segurança (Account Lockout) ---
+    LOGIN_MAX_FAILED_ATTEMPTS=5
+    LOGIN_LOCKOUT_MINUTES=15
 
-git clone https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git
-cd SEU_REPOSITORIO
-Crie e ative um ambiente virtual:
+    # --- Configurações OIDC JWT Claims ---
+    JWT_ISSUER="http://localhost:8001" # URL base da sua API Auth
+    JWT_AUDIENCE="vrsales-api" # ID da sua API principal (ex: VRSales)
+    ```
 
-Bash
+### 3. Migrar o Banco de Dados (Alembic)
 
-python -m venv venv
-source venv/bin/activate # (Linux/macOS)
-.\venv\Scripts\activate # (Windows)
-Instale as dependências:
-
-Bash
-
-pip install -r requirements.txt
-# Instale o driver async do seu banco, se ainda não estiver listado:
-# pip install asyncpg # Para PostgreSQL
-# pip install aiosqlite # Para SQLite
-# pip install aiomysql # Para MySQL
-2. Configuração
-Crie um banco de dados (ex: auth_db).
-
-Crie um arquivo .env na raiz do projeto e adicione/ajuste as seguintes variáveis:
-
-Ini, TOML
-
-# --- Banco de Dados ---
-# AJUSTE com o driver async correto e suas credenciais
-DATABASE_URL="postgresql+asyncpg://USUARIO:SENHA@localhost:5432/auth_db"
-# Exemplo SQLite: DATABASE_URL="sqlite+aiosqlite:///./auth.db"
-# Exemplo MySQL: DATABASE_URL="mysql+aiomysql://USUARIO:SENHA@localhost:3306/auth_db"
-
-# --- Chaves Secretas (use 'openssl rand -hex 32' para gerar) ---
-SECRET_KEY="SUA_CHAVE_SECRETA_FORTE_AQUI"
-REFRESH_SECRET_KEY="UMA_CHAVE_SECRETA_DIFERENTE_E_FORTE_AQUI"
-ALGORITHM="HS256"
-
-# --- Chave da API de Gerenciamento (use 'openssl rand -hex 64') ---
-INTERNAL_API_KEY="sk_live_UMA_CHAVE_SECRETA_MUITO_FORTE_PARA_SISTEMAS"
-
-# --- Configurações de Email (SendGrid) ---
-SENDGRID_API_KEY="SG.SUA_CHAVE_API_SENDGRID_AQUI"
-EMAIL_FROM="seu_email_verificado@sendgrid.com"
-EMAIL_FROM_NAME="Auth API"
-
-# --- URLs do SEU Frontend ---
-VERIFICATION_URL_BASE="http://localhost:3000/verify-email"
-RESET_PASSWORD_URL_BASE="http://localhost:3000/reset-password"
-
-# --- Configurações de Segurança (Account Lockout) ---
-LOGIN_MAX_FAILED_ATTEMPTS=5
-LOGIN_LOCKOUT_MINUTES=15
-
-# --- Configurações OIDC JWT Claims ---
-JWT_ISSUER="http://localhost:8001" # URL base da sua API Auth
-JWT_AUDIENCE="vrsales-api" # ID da sua API principal (ex: VRSales)
-3. Migrar o Banco de Dados (Alembic)
 Este projeto usa Alembic para gerenciar o schema do banco de dados de forma segura.
 
-Para criar todas as tabelas pela primeira vez ou aplicar novas alterações de schema, rode:
+Para criar todas as tabelas pela primeira vez ou aplicar novas alterações de schema (como as de MFA), rode:
 
-Bash
-
+```bash
 alembic upgrade head
-Isso criará/atualizará as tabelas users, refresh_tokens e alembic_version no banco de dados configurado no .env.
+```
 
-4. Rodar o Servidor
+Isso criará/atualizará as tabelas users (com campos otp_secret, is_mfa_enabled), refresh_tokens e alembic_version no banco.
+
+### 4. Rodar o Servidor
 Use o Uvicorn para rodar a aplicação:
 
-Bash
-
+```Bash
 # O --reload monitora mudanças nos arquivos (ótimo para dev)
-uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+uvicorn main:app --host 0.0.0.0 --port 8001 --reload 
+```
 A API estará disponível em http://localhost:8001 🚀. A documentação interativa (Swagger UI) estará em http://localhost:8001/docs.
 
 ### 🐳 Rodando com Docker (Recomendado)
-Para uma experiência mais isolada e consistente, você pode usar o Docker.
+Para uma experiência mais isolada e consistente com a implementação Python.
 
-**Pré-requisitos:**
-- Docker e Docker Compose instalados.
+1. Configure o .env: Preencha o arquivo .env como na seção "Configuração" acima. A única diferença é que o DATABASE_URL deve apontar para o serviço do banco de dados do Docker:
 
-**Passos:**
+```DATABASE_URL="postgresql+asyncpg://user:password@db:5432/auth_db"```
+_(Estes valores vêm do docker-compose.yml)_
 
-1.  **Configure o `.env`:**
-    Copie ou renomeie `.env.example` para `.env` e preencha as variáveis como descrito na seção "Configuração" acima. A única diferença é que o `DATABASE_URL` deve apontar para o serviço do banco de dados do Docker:
-    ```
-    DATABASE_URL="postgresql+asyncpg://user:password@db:5432/auth_db"
-    ```
+2. Build e Run: Suba os serviços (API e banco de dados) em background:
 
-2.  **Build e Run:**
-    Suba os serviços (API e banco de dados) em background:
-    ```bash
-    docker-compose up --build -d
-    ```
-
-3.  **Aplicar Migrações:**
-    Execute as migrações do Alembic dentro do container da aplicação:
-    ```bash
-    docker-compose exec app alembic upgrade head
-    ```
-
-A API estará disponível em `http://localhost:8001` e o banco de dados em `localhost:5432`.
-
-**Para parar os serviços:**
-```bash
-docker-compose down
+```Bash
+docker-compose up --build -d
 ```
 
-🌐 Compatibilidade Universal: Como Funciona?
-Esta API foi desenhada para ser compatível com qualquer sistema ou linguagem de programação moderna. Isso é possível graças a três pilares:
+3. Aplicar Migrações: Execute as migrações do Alembic dentro do container da aplicação:
 
-REST API (HTTP + JSON):
+```Bash
+docker-compose exec app alembic upgrade head
+```
+A API (Python) estará disponível em http://localhost:8001.
 
-A API se comunica usando os padrões universais da web: HTTP para requisições e JSON para dados.
+# 🚀 Começando (Rust / Axum)
+Esta é uma implementação alternativa focada em performance, localizada na pasta ```/rust.```
 
-Qualquer linguagem (C, C++, C#, Java, Python, Go, Rust, JavaScript, etc.) que possua uma biblioteca para fazer chamadas HTTP e manipular JSON pode interagir com esta API.
+### 1. Instalação (Rust)
+1. Navegue até o diretório Rust:
 
-Você não precisa de bibliotecas Python específicas no seu sistema cliente (ex: VRSales em C#). Você só precisa de um cliente HTTP padrão.
+```Bash
+cd rust
+```
 
-Tokens JWT Padronizados:
+2. Instale o sqlx-cli (se ainda não o tiver):
 
-A API emite JSON Web Tokens (JWTs) para representar a sessão do usuário. JWT é um padrão aberto (RFC 7519).
+```Bash
+cargo install sqlx-cli --features rustls,postgres
+```
+### 2. Configuração (Rust)
+Crie um arquivo ```.env``` dentro da pasta ```rust``` e adicione:
 
-Qualquer linguagem possui bibliotecas maduras para validar JWTs (verificar assinatura usando a SECRET_KEY compartilhada) e extrair os claims (informações) de dentro dele.
+```Ini, TOML
+# --- Database ---
+DATABASE_URL="sqlite:auth.db" # ou "postgresql://user:pass@host/db"
 
-Seu sistema cliente (VRSales) não precisa chamar a API Auth a cada requisição. Ele apenas valida o JWT que o frontend envia, tornando a verificação rápida e offline.
+# --- Secret Keys (generate with 'openssl rand -hex 32') ---
+SECRET_KEY="YOUR_STRONG_SECRET_KEY"
+REFRESH_SECRET_KEY="A_DIFFERENT_STRONG_SECRET_KEY"
 
-Claims OIDC Padrão + Custom Claims:
+# --- Management API Key (generate with 'openssl rand -hex 64') ---
+INTERNAL_API_KEY="sk_live_A_VERY_STRONG_SECRET_KEY_FOR_SYSTEMS"
 
-Os JWTs emitidos contêm claims padrão do OpenID Connect (OIDC) como iss (emissor), aud (audiência), sub (ID do usuário), exp (expiração), email, name, etc. Bibliotecas OIDC em qualquer linguagem já sabem como interpretar esses claims.
+# --- OIDC JWT Claims Settings ---
+JWT_ISSUER="http://localhost:8001"
+JWT_AUDIENCE="yourapp-api"
 
-Além disso, você pode injetar seus próprios custom_claims (como roles, store_id, permissions) no JWT.
+# --- Server Settings ---
+HOST="127.0.0.1"
+PORT="8001"
+```
 
-Isso significa que o seu sistema cliente (VRSales), após validar o JWT, tem imediatamente todas as informações de que precisa (quem é o usuário e o que ele pode fazer) sem precisar consultar o banco de dados da API Auth novamente.
+### 3. Migrar o Banco de Dados (SQLx)
+Na pasta ```rust```, rode:
 
-Em resumo: A API Auth funciona como um "cartório digital". Qualquer sistema pode pedir a ela para verificar a identidade de um usuário (/token). A API Auth devolve um "documento autenticado" (o JWT) que contém informações padrão (OIDC) e informações específicas (custom claims). Qualquer sistema que confie na assinatura da API Auth (usando a SECRET_KEY) pode ler esse documento e tomar suas próprias decisões de autorização.
+```Bash
+sqlx migrate run
+```
+Isso executará os scripts SQL na pasta ```rust/migrations.```
 
-🛠️ Fluxo de Integração (Tutorial)
-Este é o guia passo-a-passo de como um desenvolvedor deve integrar esta Auth API em seu sistema (ex: um E-commerce).
+*** 4. Rodar o Servidor (Rust)
 
-Passo 1: ✍️ Registrar o Usuário (Backend Cliente -> API Auth)
-O usuário se registra no seu sistema (ex: E-commerce). O backend do seu sistema faz uma chamada para a Auth API.
+```Bash
+cargo run
+```
+O servidor Rust estará disponível em ```http://localhost:8001.```
 
-POST /api/v1/users/
+# 🛠️ Fluxo de Integração (Tutorial)
+Este é o guia passo-a-passo de como um desenvolvedor deve integrar esta Auth API (Python) em seu sistema (ex: um E-commerce).
 
-Bash
+### Passo 1: ✍️ Registrar o Usuário (Backend Cliente -> API Auth)
+O usuário se registra no seu sistema. O backend do seu sistema faz uma chamada para a Auth API.
 
-curl -X 'POST' \
-'http://localhost:8001/api/v1/users/' \
--H 'accept: application/json' \
+`POST /api/v1/users/`
+
+```Bash
+curl -X 'POST' 'http://localhost:8001/api/v1/users/' \
 -H 'Content-Type: application/json' \
 -d '{
-"email": "novo_usuario@meusistema.com",
-"password": "Password123!",
-"full_name": "Nome Completo"
+    "email": "novo_usuario@meusistema.com",
+    "password": "Password123!",
+    "full_name": "Nome Completo"
 }'
-Resultado: O usuário é criado na API Auth com is_active: false. Um email de verificação é enviado.
+```
+Resultado: O usuário é criado com `is_active: false.` Um email de verificação é enviado em background.
 
-Passo 2: 📧 Ativar o Usuário (Usuário -> Frontend -> API Auth)
-O usuário clica no link em seu email. O link aponta para o seu frontend (VERIFICATION_URL_BASE), que extrai o token da URL e chama a API Auth:
+### Passo 2: 📧 Ativar o Usuário (Usuário -> Frontend -> API Auth)
+O usuário clica no link em seu email. O link aponta para o seu frontend `(VERIFICATION_URL_BASE)`, que extrai o token da URL e chama a API Auth:
 
-GET /api/v1/auth/verify-email/{token}
+`GET /api/v1/auth/verify-email/{token}`
 
-Resultado: O usuário na API Auth é atualizado para is_active: true, is_verified: true.
+Resultado: O usuário é atualizado para `is_active: true`, `is_verified: true.`
 
-Passo 3: 🔑 Definir Roles e Claims (Backend Cliente -> API Auth)
-O backend do seu sistema (E-commerce) decide quais permissões (roles, store_id, etc.) esse novo usuário tem. Ele usa a API de Gerenciamento (/mgmt) da API Auth, autenticando-se com a INTERNAL_API_KEY.
+### Passo 3: 🔑 Definir Roles e Claims (Backend Cliente -> API Auth)
+O backend do seu sistema (E-commerce) decide quais permissões (roles, etc.) esse usuário tem. Ele usa a API de Gerenciamento (/mgmt), autenticando-se com a INTERNAL_API_KEY.
 
-PATCH /api/v1/mgmt/users/{id_ou_email}/claims
+`PATCH /api/v1/mgmt/users/{id_ou_email}/claims`
 
-Bash
-
+```Bash
 curl -X 'PATCH' \
 'http://localhost:8001/api/v1/mgmt/users/novo_usuario@meusistema.com/claims' \
--H 'accept: application/json' \
 -H 'X-API-Key: sk_live_UMA_CHAVE_SECRETA_MUITO_FORTE...' \
 -H 'Content-Type: application/json' \
 -d '{
-"roles": ["user", "beta_tester"],
-"permissions": ["read:products", "write:cart"],
-"ecommerce_user_id": 4567
+    "roles": ["user", "beta_tester"],
+    "permissions": ["read:products", "write:cart"],
+    "ecommerce_user_id": 4567
 }'
+```
 Resultado: A API Auth armazena este JSON no campo custom_claims do usuário.
 
-Passo 4: 🎟️ Login com Scopes (Frontend -> API Auth)
-Quando o usuário faz login no seu frontend, o frontend chama diretamente a API Auth, pedindo os scopes (claims customizados) que sua aplicação precisa ver no token.
+### Passo 4: 🎟️ Login com Scopes (Frontend -> API Auth)
+Quando o usuário faz login, o frontend chama a API Auth, pedindo os `scopes` (claims customizados) que sua aplicação precisa.
 
-POST /api/v1/auth/token
+`POST /api/v1/auth/token`
 
-Bash
-
+```Bash
 # Frontend envia como application/x-www-form-urlencoded
-curl -X 'POST' \
-'http://localhost:8001/api/v1/auth/token' \
--H 'accept: application/json' \
+curl -X 'POST' 'http://localhost:8001/api/v1/auth/token' \
 -H 'Content-Type: application/x-www-form-urlencoded' \
 -d 'username=novo_usuario@meusistema.com&password=Password123!&scope=roles+permissions+ecommerce_user_id'
-Parâmetro scope: Pedimos roles, permissions e ecommerce_user_id. A API Auth irá buscar esses campos no custom_claims e injetá-los no JWT, junto com os claims OIDC padrão.
+```
 
-Passo 5: 🛡️ Usar o JWT (Frontend -> Backend Cliente)
-O frontend recebe o access_token da API Auth. O payload desse token (decodificado) será algo como:
+### Passo 5: 🛡️ Fluxo de Login (Interpretação da Resposta)
+Caso A: Login normal (Sem MFA)
+A API Auth retorna `HTTP 200` com os tokens. O payload do `access_token` (decodificado) será:
 
-JSON
+```JSON
 
 {
-"iss": "http://localhost:8001",
-"aud": "vrsales-api",
-"sub": "123", // ID do usuário na API Auth
-"exp": 1678886400,
-"iat": 1678882800,
-"email": "novo_usuario@meusistema.com",
-"email_verified": true,
-"name": "Nome Completo",
-"token_type": "access",
-"roles": ["user", "beta_tester"], // Veio do custom_claims via scope
-"permissions": ["read:products", "write:cart"], // Veio do custom_claims via scope
-"ecommerce_user_id": 4567 // Veio do custom_claims via scope
+  "iss": "http://localhost:8001",
+  "aud": "vrsales-api",
+  "sub": "123",
+  "exp": 1678886400,
+  "email": "novo_usuario@meusistema.com",
+  "amr": ["pwd"], // Authentication Method: Password
+  "roles": ["user", "beta_tester"], // Veio do custom_claims via scope
+  "permissions": ["read:products", "write:cart"], // Veio do custom_claims
+  "ecommerce_user_id": 4567 // Veio do custom_claims
 }
-Agora, quando o frontend faz uma chamada para o backend do seu E-commerce (ex: GET /api/products), ele envia este access_token no header Authorization: Bearer
+```
 
-O backend do seu E-commerce só precisa:
+### Caso B: Login com MFA Habilitado
+A API Auth retorna `HTTP 200` com um challenge token:
 
-Pegar a SECRET_KEY do seu próprio .env (que deve ser a mesma da API Auth).
+```JSON
+{
+  "detail": "MFA verification required",
+  "mfa_challenge_token": "eyJhbGciOiJIUzI1NiIs... (token de 5 min)"
+}
+```
+O frontend deve então exibir a tela "Insira seu código de 6 dígitos" e fazer uma segunda chamada:
 
-Validar a assinatura, a expiração, o iss (issuer) e o aud (audience) do JWT.
+`POST /api/v1/auth/mfa/verify`
 
-Olhar os claims (ex: token_data["roles"], token_data["store_id"], token_data["sub"]) e aplicar sua própria lógica de autorização.
+```Bash
+curl -X 'POST' 'http://localhost:8001/api/v1/auth/mfa/verify' \
+-H 'Content-Type: application/json' \
+-d '{
+    "mfa_challenge_token": "eyJhbGciOiJIUzI1NiIs... (token de 5 min)",
+    "otp_code": "123456"
+}'
+```
+Se o código estiver correto, a API retorna `HTTP 200` com os tokens. O payload do `access_token` agora refletirá que o MFA foi validado:
 
-Seu backend E-commerce nunca mais precisará consultar o banco de dados da API Auth para saber quem é o usuário ou o que ele pode fazer a cada requisição. Toda a informação necessária está segura dentro do JWT.
+```JSON
 
-📚 Referência da API
-A API é dividida em três seções principais. Para detalhes completos dos endpoints e schemas, veja a documentação interativa em /docs.
+{
+  "iss": "http://localhost:8001",
+  "aud": "vrsales-api",
+  "sub": "123",
+  "exp": 1678886400,
+  "email": "novo_usuario@meusistema.com",
+  "amr": ["pwd", "mfa"], // Authentication Methods: Password E MFA
+  "roles": ["user", "beta_tester"],
+  "permissions": ["read:products", "write:cart"],
+  "ecommerce_user_id": 4567
+}
+```
 
-1. 🔑 Authentication (/api/v1/auth)
-Descrição: Endpoints públicos para o ciclo de vida da autenticação.
+### Passo 6: 🛡️ Usar o JWT (Frontend -> Backend Cliente)
+O frontend envia o `access_token` final para o backend do seu E-commerce (ex: `GET /api/products`) no header `Authorization: Bearer <token>`.
 
-Endpoints Chave:
+O backend do seu E-commerce (VRSales) só precisa:
 
-POST /token: Login para obter tokens JWT (pode receber scope, retorna claims OIDC + scopes).
+1. Validar a assinatura, expiração, `iss` (issuer) e `aud` (audience) do JWT.
 
-POST /refresh: Obter um novo access_token usando um refresh_token (o novo token não contém custom claims).
+2. Opcional (Recomendado): Verificar o claim `amr`. Se sua rota (`/admin/delete_product`) exige alta segurança, você pode rejeitar tokens que não contenham `"mfa"` no array `amr`.
 
-POST /logout: Revogar um refresh_token.
+3. Olhar os claims (`token_data["roles"]`, `token_data["ecommerce_user_id"]`) e aplicar sua própria lógica de autorização.
 
-GET /verify-email/{token}: Ativar uma conta.
+Seu backend E-commerce nunca mais precisará consultar o banco de dados da API Auth para saber quem é o usuário ou o que ele pode fazer a cada requisição.
 
-POST /forgot-password: Iniciar o fluxo de reset de senha.
+# 📚 Referência da API (Python/FastAPI)
+A API é dividida em três seções principais. Para detalhes completos dos endpoints e schemas, veja a documentação interativa em `/docs`.
 
-POST /reset-password: Definir uma nova senha com um token.
+### 1. 🔑 Authentication (`/api/v1/auth`)
+`POST /token`: Login (Pode retornar `Token` ou `MFARequiredResponse)`.
 
-GET /me: Obter os dados do usuário logado (requer token).
+`POST /mfa/verify`: Verifica o código OTP após o login (retorna `Token`).
 
-2. 👤 User Management (/api/v1/users)
-Descrição: Endpoints para gerenciamento de usuários.
+`POST /mfa/enable`: Inicia a habilitação do MFA (retorna `MFAEnableResponse` com QR Code).
 
-Endpoints Chave:
+`POST /mfa/confirm`: Confirma e ativa o MFA com o primeiro código.
 
-POST /: Registrar um novo usuário (envia email de verificação).
+`POST /mfa/disable`: Desativa o MFA (requer um código OTP válido).
 
-GET /: Listar usuários (Protegido, requer role 'admin').
+`POST /refresh`: Obter um novo `access_token` (o novo token terá `amr: ["pwd"])`.
 
-GET /{user_id}: Buscar um usuário por ID (Protegido, requer role 'admin').
+`POST /logout`: Revogar um `refresh_token`.
 
-PUT /me: Atualizar os dados do próprio usuário logado.
+`GET /verify-email/{token}`: Ativar uma conta.
 
-3. ⚙️ Internal Management (/api/v1/mgmt)
-Descrição: Endpoints privados para gerenciamento sistema-para-sistema.
+`POST /forgot-password`: Iniciar o fluxo de reset de senha.
 
-Proteção: Requer o INTERNAL_API_KEY no header X-API-Key.
+`POST /reset-password`: Definir uma nova senha com um token.
 
-Endpoints Chave:
+`GET /me`: Obter os dados do usuário logado (requer token).
 
-PATCH /users/{id_ou_email}/claims: Mescla (Atualiza) os custom_claims de um usuário (preferencial).
+### 2. 👤 User Management (`/api/v1/users`)
+`POST /`: Registrar um novo usuário (público).
 
-🤝 Contribuição
-Contribuições são muito bem-vindas! Sinta-se à vontade para abrir uma issue ou enviar um pull request.
+`GET /`: Listar usuários (Protegido, requer role 'admin').
 
-Faça um Fork do projeto.
+`GET /{user_id}`: Buscar um usuário por ID (Protegido, requer role 'admin').
 
-Crie sua Feature Branch (git checkout -b feature/MinhaFeatureIncrivel).
+`PUT /me`: Atualizar os dados do próprio usuário logado.
 
-Faça o Commit de suas mudanças (git commit -m 'feat: Adiciona MinhaFeatureIncrivel').
+### 3. ⚙️ Internal Management (`/api/v1/mgmt`)
+Proteção: Requer o `INTERNAL_API_KEY` no header `X-API-Key`.
 
-Faça o Push para a Branch (git push origin feature/MinhaFeatureIncrivel).
+`PATCH /users/{id_ou_email}/claims`: Mescla (Atualiza) os `custom_claims` de um usuário.
 
-Abra um Pull Request.
-
-📜 Licença
-Este projeto está licenciado sob a Licença MIT. Veja o arquivo LICENSE para mais detalhes.
+# 📜 Licença
+Este projeto está licenciado sob a Licença MIT. Veja o arquivo `LICENSE` para mais detalhes.
