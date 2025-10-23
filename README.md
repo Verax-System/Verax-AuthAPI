@@ -40,28 +40,30 @@ Este design oferece flexibilidade total, permitindo que qualquer sistema utilize
 
 ### Implementação Principal (Python / FastAPI)
 
-* **Gerenciamento de Identidade:** Registro de usuário e recuperação de perfil (`/users/`, `/me`).
-* **Fluxo de Tokens (JWT):** Login com `access_token` e `refresh_token` (com rotação).
-* **Claims JWT Padrão OIDC:** Tokens incluem `iss`, `aud`, `sub`, `iat`, `exp`, `email`, `email_verified`, `name` e `amr` (Authentication Methods Reference).
-* **Autenticação de Múltiplos Fatores (MFA/TOTP):**
+* ✅ **Gerenciamento de Identidade:** Registro de usuário e recuperação de perfil (`/users/`, `/me`).
+* ✅ **Fluxo de Tokens (JWT):** Login com `access_token` e `refresh_token` (com rotação).
+* ✅ **Claims JWT Padrão OIDC:** Tokens incluem `iss`, `aud`, `sub`, `iat`, `exp`, `email`, `email_verified`, `name` e `amr` (Authentication Methods Reference).
+* ✅ **Autenticação de Múltiplos Fatores (MFA/TOTP):**
     * Fluxo completo para Habilitar, Confirmar e Desabilitar MFA (via Google Authenticator, Authy, etc.).
     * Geração de QR Code (Base64) e URI `otpauth://`.
     * Verificação MFA (2-step) no login, retornando um `mfa_challenge_token`.
-* **Segurança de Senha:** Hashing de senha forte (Bcrypt) com limite de 72 bytes.
-* **Fluxos de Email (SendGrid):**
+* ✅ **Segurança de Senha:** Hashing de senha forte (Bcrypt) com limite de 72 bytes.
+* ✅ **Fluxos de Email (SendGrid):**
     * Verificação de Email para ativação de conta.
     * Recuperação de Senha ("esqueci minha senha").
-* **Proteção de Login:**
+* ✅ **Proteção de Login:**
     * Rate Limiting (SlowAPI).
     * Bloqueio de Conta (Account Lockout) após tentativas falhas.
     * Teste de integração para Lockout (`test_lockout.py`).
-* **Autorização Agnóstica (Custom Claims):** Injeta `roles`, `permissions`, `store_id` ou qualquer outro dado customizado no JWT via `scope`.
-* **API de Gerenciamento (Management):** Endpoints seguros (`/mgmt`) para gerenciar `custom_claims` de usuários via `X-API-Key`.
-* **RBAC Interno:** Endpoints da própria API protegidos por roles (ex: "admin-only" para listar usuários).
-* **Migrações de Banco de Dados:** Gerenciamento de schema seguro com Alembic.
-* **Agnóstica de Banco de Dados:** Código compatível com PostgreSQL, SQLite, MySQL (requer driver async apropriado).
-* **Async:** Totalmente assíncrono (FastAPI, SQLAlchemy 2.0, AsyncPG/AioSQLite).
-* **Docker:** Suporte completo via `Dockerfile` e `docker-compose.yml`.
+* ✅ **Autorização Agnóstica (Custom Claims):** Injeta `roles`, `permissions`, `store_id` ou qualquer outro dado customizado no JWT via `scope`.
+* ✅ **API de Gerenciamento (Management):** Endpoints seguros (`/mgmt`) para gerenciar `custom_claims` de usuários via `X-API-Key`.
+* ✅ **RBAC Interno:** Endpoints da própria API protegidos por roles (ex: "admin-only" para listar usuários).
+* ✅ **Migrações de Banco de Dados:** Gerenciamento de schema seguro com Alembic.
+* ✅ **Agnóstica de Banco de Dados:** Código compatível com PostgreSQL, SQLite, MySQL (requer driver async apropriado).
+* ✅ **Async:** Totalmente assíncrono (FastAPI, SQLAlchemy 2.0, AsyncPG/AioSQLite).
+* ✅ **Docker:** Suporte completo via `Dockerfile` e `docker-compose.yml`.
+* ✅ **Login Social (Google OAuth2):**
+    * Permite que os utilizadores façam login ou se registem usando a sua conta Google.
 
 ### Implementação Alternativa (Rust / Axum)
 
@@ -359,6 +361,59 @@ O backend do seu E-commerce (VRSales) só precisa:
 3. Olhar os claims (`token_data["roles"]`, `token_data["ecommerce_user_id"]`) e aplicar sua própria lógica de autorização.
 
 Seu backend E-commerce nunca mais precisará consultar o banco de dados da API Auth para saber quem é o usuário ou o que ele pode fazer a cada requisição.
+
+### Passo 7: 🔐 Autenticação Multifator (MFA/2FA)
+
+Esta API suporta MFA baseado em Tempo (TOTP) usando aplicações autenticadoras como Google Authenticator ou Authy.
+
+**Fluxo de Habilitação:**
+
+1.  **Iniciar:** O utilizador autenticado chama `POST /api/v1/auth/mfa/enable`.
+    * **Ação:** A API gera um segredo OTP, guarda-o temporariamente, e retorna uma `otp_uri` e um `qr_code_base64`.
+    * **Frontend:** Mostra o QR Code ou a URI para o utilizador escanear na sua app autenticadora.
+
+2.  **Confirmar:** O utilizador insere o código de 6 dígitos da app e chama `POST /api/v1/auth/mfa/confirm` com o `otp_code`.
+    * **Ação:** A API verifica o código OTP contra o segredo pendente. Se válido, marca `is_mfa_enabled = True`, gera 10 códigos de recuperação de uso único, guarda os seus hashes, e retorna o utilizador atualizado juntamente com os **códigos de recuperação em texto simples**.
+    * **Frontend:** Mostra os códigos de recuperação ao utilizador **APENAS NESTA ALTURA**, instruindo-o a guardá-los num local seguro.
+
+**Fluxo de Login com MFA:**
+
+1.  **Senha:** O utilizador envia e-mail e senha para `POST /api/v1/auth/token`.
+2.  **Desafio:** Se a senha estiver correta e MFA estiver ativo, a API retorna `200 OK` com um `mfa_challenge_token` temporário.
+3.  **Verificação (Opção 1 - OTP):** O utilizador insere o código da app autenticadora e chama `POST /api/v1/auth/mfa/verify` com o `mfa_challenge_token` e o `otp_code`.
+4.  **Verificação (Opção 2 - Recuperação):** Se o utilizador perdeu o acesso à app, ele insere um dos seus códigos de recuperação guardados e chama `POST /api/v1/auth/mfa/verify-recovery` com o `mfa_challenge_token` e o `recovery_code`.
+5.  **Sucesso:** Se a verificação (OTP ou recuperação) for válida, a API retorna os tokens JWT finais (`access_token`, `refresh_token`). O código de recuperação utilizado é marcado como inválido.
+
+**Fluxo de Desabilitação:**
+
+1.  O utilizador autenticado chama `POST /api/v1/auth/mfa/disable` enviando um `otp_code` válido atual.
+2.  A API verifica o código, marca `is_mfa_enabled = False`, apaga o `otp_secret` e **apaga todos os códigos de recuperação associados**.
+
+---
+
+### Passo 8: 🌐 Login Social (Google OAuth2)
+
+Permite que os utilizadores façam login ou se registem usando a sua conta Google.
+
+**Configuração Prévia:**
+
+1.  Registe a sua aplicação na Google Cloud Console para obter um `Client ID` e `Client Secret`.
+2.  Adicione o **URI de redirecionamento do seu frontend** (ex: `http://localhost:3000/google-callback`) aos "Authorized redirect URIs" na Google Cloud Console.
+3.  Adicione `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, e `GOOGLE_REDIRECT_URI_FRONTEND` ao seu ficheiro `.env`.
+4.  Certifique-se de que a coluna `hashed_password` na tabela `users` permite valores `NULL` (necessário executar a migração Alembic correspondente).
+
+**Fluxo de Autenticação (Produção):**
+
+1.  **Frontend -> API:** Chama `GET /api/v1/auth/google/login-url`.
+    * **Resposta da API:** `{ "url": "https://accounts.google.com/o/oauth2/..." }` (o URL é construído com o `GOOGLE_REDIRECT_URI_FRONTEND`).
+2.  **Frontend -> Utilizador:** Redireciona o browser do utilizador para o URL recebido.
+3.  **Utilizador -> Google:** Faz login na Google e autoriza a sua aplicação.
+4.  **Google -> Frontend:** Redireciona o browser do utilizador de volta para o `GOOGLE_REDIRECT_URI_FRONTEND` com um parâmetro `code` (ex: `http://localhost:3000/google-callback?code=ABC123XYZ...`).
+5.  **Frontend -> API:** Extrai o `code` do URL e chama `POST /api/v1/auth/google/callback` com o corpo JSON `{"code": "ABC123XYZ..."}`.
+6.  **API -> Google:** A API troca o `code` pelo perfil do utilizador Google (usando o `CLIENT_SECRET`).
+7.  **API (Interno):** Procura o utilizador pelo e-mail na base de dados. Se não existir, cria um novo utilizador (já ativo e verificado, sem senha).
+8.  **API -> Frontend:** Gera e retorna os tokens JWT (`access_token`, `refresh_token`) da *sua própria* API.
+9.  **Frontend:** Guarda os tokens e considera o utilizador autenticado.
 
 # 📚 Referência da API (Python/FastAPI)
 A API é dividida em três seções principais. Para detalhes completos dos endpoints e schemas, veja a documentação interativa em `/docs`.
