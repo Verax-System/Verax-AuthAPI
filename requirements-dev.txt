@@ -1,2 +1,9 @@
 pytest
 requests
+ruff
+mypy          
+bandit      
+safety        
+pytest-cov
+pytest-asyncio  
+aiosqlite

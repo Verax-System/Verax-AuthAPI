@@ -23,6 +23,8 @@ fastapi==0.119.1
 greenlet==3.2.4
 h11==0.16.0
 httptools==0.7.1
+uvicorn==0.38.0
+gunicorn
 idna==3.11
 # --- REMOVER LINHAS INVÁLIDAS ---
 # pip install aiomysql

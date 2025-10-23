@@ -1,0 +1,65 @@
+# .github/workflows/ci.yml
+#
+# Pipeline de CI (Continuous Integration) para a API de Autenticação Python
+# Versão Profissional com Múltiplas Verificações
+
+name: Python CI Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+      
+      - name: Lint with Ruff
+        run: |
+          ruff check .
+          ruff format --check .
+
+      # --- NOVAS ETAPAS DE VERIFICAÇÃO ---
+
+      - name: Static Type Checking (MyPy)
+        run: |
+          # Verifica o código da aplicação por erros de tipo
+          mypy app
+      
+      - name: Code Security Scan (Bandit)
+        run: |
+          # Roda o scan de segurança no código da aplicação (-r: recursivo)
+          # -lll: Reporta apenas problemas de confiança ALTA (High)
+          bandit -r app -lll
+      
+      - name: Dependency Security Scan (Safety)
+        run: |
+          # Verifica o 'requirements.txt' por vulnerabilidades conhecidas
+          safety check -r requirements.txt
+      
+      # --- ETAPA DE TESTE ATUALIZADA ---
+      
+      - name: Run Pytest with Coverage
+        run: |
+          # Roda os testes, medindo a cobertura do diretório 'app'
+          # Falha o build se a cobertura for menor que 80%
+          pytest --cov=app --cov-report=term --cov-fail-under=80
