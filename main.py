@@ -3,7 +3,8 @@ from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 # --- Imports de Segurança ---
-from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
+# IMPORTAR HTTPBearer
+from fastapi.security import OAuth2PasswordBearer, APIKeyHeader, HTTPBearer
 # --- Fim Imports ---
 
 # --- Adicionar imports do slowapi ---
@@ -15,18 +16,18 @@ from slowapi.middleware import SlowAPIMiddleware
 from app.db.session import dispose_engine
 # Importar routers
 from app.api.endpoints import auth, users, mgmt
-# Importar dependência de chave de API
-from app.api.dependencies import get_api_key
+# Importar dependência de chave de API E OS NOVOS ESQUEMAS
+from app.api.dependencies import get_api_key, oauth2_scheme, bearer_scheme, api_key_scheme
 
 # Importar modelos para Alembic/Base.metadata
 from app.db.base import Base # noqa
 from app.models import user, refresh_token # noqa
 
-# --- Definir Esquemas de Segurança Aqui ---
-# Mesmo que já definidos em dependencies.py, definir aqui ajuda o OpenAPI/Swagger
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token", description="OAuth2 Password Flow")
-api_key_scheme = APIKeyHeader(name="X-API-Key", description="Chave de API para endpoints /mgmt")
-# --- Fim Definição Esquemas ---
+# --- REMOVER DEFINIÇÕES DE ESQUEMAS DAQUI ---
+# Elas agora são importadas de 'dependencies.py'
+# oauth2_scheme = ... (REMOVER)
+# api_key_scheme = ... (REMOVER)
+# --- FIM REMOÇÃO ---
 
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["10/minute"])
@@ -39,8 +40,12 @@ app = FastAPI(
     # Isso informa explicitamente ao Swagger UI sobre os métodos de autenticação
     openapi_components={
         "securitySchemes": {
-            "OAuth2PasswordBearer": oauth2_scheme, # Usado para login e Bearer token
-            "APIKeyHeader": api_key_scheme        # Usado para /mgmt
+            # 1. Para o /token (fluxo de senha)
+            "OAuth2PasswordBearer": oauth2_scheme, 
+            # 2. NOVO: Para os endpoints com cadeado (colar o token)
+            "BearerAuth": bearer_scheme,
+            # 3. Para o /mgmt
+            "APIKeyHeader": api_key_scheme        
         }
     }
     # --- Fim OpenAPI ---
@@ -76,8 +81,8 @@ app.include_router(
     auth.router,
     prefix=f"{api_prefix}/auth",
     tags=["Authentication"],
-    # Associar endpoints deste router ao esquema Bearer para o Swagger UI
-    dependencies=[Depends(oauth2_scheme)] # Ajuda o Swagger a mostrar o campo Bearer
+    # REMOVA a dependência do router
+    # dependencies=[Depends(oauth2_scheme)] # <-- REMOVA ESTA LINHA
 )
 
 # --- Router de Usuários ---
@@ -87,8 +92,8 @@ app.include_router(
     users.router,
     prefix=f"{api_prefix}/users",
     tags=["Users"],
-    # Associar endpoints deste router ao esquema Bearer para o Swagger UI
-    dependencies=[Depends(oauth2_scheme)] # Ajuda o Swagger a mostrar o campo Bearer
+    # REMOVA a dependência do router
+    # dependencies=[Depends(oauth2_scheme)] # <-- REMOVA ESTA LINHA
 )
 
 # --- Router de Gerenciamento ---
@@ -112,4 +117,3 @@ async def shutdown_event():
 @app.get("/")
 def read_root():
     return {"message": "Auth API is running!"}
-

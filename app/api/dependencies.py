@@ -1,6 +1,7 @@
 # auth_api/app/api/dependencies.py
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, APIKeyHeader # Importar APIKeyHeader
+# IMPORTAR HTTPBearer e HTTPAuthorizationCredentials
+from fastapi.security import OAuth2PasswordBearer, APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import AsyncGenerator
 import secrets # Importar secrets para comparação segura
@@ -13,18 +14,47 @@ from app.models.user import User as UserModel
 from app.crud.crud_user import user as crud_user
 from app.core.config import settings # Importar settings
 
-# Define oauth2_scheme HERE using the correct tokenUrl
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token") # Adjusted tokenUrl
+# Define oauth2_scheme (ISTO SERÁ USADO APENAS PELO ENDPOINT /token)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token") 
 
-# --- get_current_user logic remains the same ---
+# --- NOVO ESQUEMA BEARER ---
+# Este esquema será usado por TODOS os endpoints protegidos
+# Ele diz ao Swagger "apenas peça um token Bearer"
+bearer_scheme = HTTPBearer(
+    description="Insira o Access Token JWT (com 'Bearer ') e.g. 'Bearer eyJ...'"
+)
+# --- FIM NOVO ESQUEMA ---
+
+# --- DEPENDÊNCIA DA CHAVE DE API (X-API-Key) ---
+# CORRIGIDO: O nome da variável agora é 'api_key_scheme' e inclui a descrição
+api_key_scheme = APIKeyHeader(name="X-API-Key", description="Chave de API para endpoints /mgmt")
+# --- FIM DEPENDÊNCIA ---
+
+
+# --- get_current_user logic (MODIFICADA) ---
 async def get_current_user_from_token(
-    db: AsyncSession = Depends(get_db), token: str = Depends(oauth2_scheme)
+    db: AsyncSession = Depends(get_db),
+    # MODIFICADO: Trocar de Depends(oauth2_scheme) para Depends(bearer_scheme)
+    creds: HTTPAuthorizationCredentials = Depends(bearer_scheme)
 ) -> UserModel:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
+        # ATUALIZADO: O header para o HTTPBearer
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    # credentials.scheme deve ser "Bearer"
+    if creds.scheme.lower() != "bearer":
+            raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Esquema de autorização inválido. Use 'Bearer'.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # credentials.credentials é o token
+    token = creds.credentials
+
     payload = security.decode_access_token(token)
     if payload is None:
         raise credentials_exception
@@ -80,9 +110,7 @@ async def get_current_admin_user(
 
 
 # --- DEPENDÊNCIA DA CHAVE DE API (X-API-Key) ---
-api_key_header_scheme = APIKeyHeader(name="X-API-Key")
-
-async def get_api_key(api_key: str = Depends(api_key_header_scheme)) -> str:
+async def get_api_key(api_key: str = Depends(api_key_scheme)) -> str: # CORRIGIDO: usa api_key_scheme
     """
     Verifica se a X-API-Key enviada no header é válida.
     """

@@ -75,6 +75,9 @@ def decode_access_token(token: str) -> Dict | None:
             settings.SECRET_KEY,
             algorithms=[settings.ALGORITHM],
             audience=settings.JWT_AUDIENCE,
+            # --- CORREÇÃO AQUI ---
+            issuer=settings.JWT_ISSUER, # Especifica o emissor esperado
+            # --- FIM CORREÇÃO ---
             options={"verify_iss": True, "verify_aud": True}
         )
         return payload
@@ -99,6 +102,9 @@ def decode_refresh_token(token: str) -> Dict | None:
             token,
             settings.REFRESH_SECRET_KEY,
             algorithms=[settings.ALGORITHM],
+            # --- CORREÇÃO AQUI ---
+            issuer=settings.JWT_ISSUER, # Especifica o emissor esperado
+            # --- FIM CORREÇÃO ---
             options={"verify_iss": True, "verify_aud": False}
         )
         if payload.get("token_type") != "refresh":
@@ -130,6 +136,10 @@ def decode_password_reset_token(token: str) -> Dict | None:
             token,
             reset_secret,
             algorithms=[settings.ALGORITHM],
+            audience=settings.JWT_AUDIENCE,
+            # --- CORREÇÃO AQUI ---
+            issuer=settings.JWT_ISSUER, # Especifica o emissor esperado
+            # --- FIM CORREÇÃO ---
             options={"verify_iss": True, "verify_aud": True}
         )
         if payload.get("token_type") != "password_reset" or "sub" not in payload:

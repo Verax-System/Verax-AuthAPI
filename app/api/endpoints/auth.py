@@ -54,6 +54,9 @@ def decode_mfa_challenge_token(token: str) -> Dict | None:
             MFA_CHALLENGE_SECRET_KEY,
             algorithms=[MFA_CHALLENGE_ALGORITHM],
             audience=settings.JWT_AUDIENCE,
+            # --- CORREÇÃO AQUI ---
+            issuer=settings.JWT_ISSUER, # Especifica o emissor esperado
+            # --- FIM CORREÇÃO ---
             options={"verify_iss": True, "verify_aud": True}
         )
         # Verifica o tipo específico do token
