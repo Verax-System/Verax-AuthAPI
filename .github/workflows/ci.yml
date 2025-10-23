@@ -52,13 +52,12 @@ jobs:
           bandit -r app -lll
       
       - name: Dependency Security Scan (Safety)
-        # Add the env block to provide the API key
         env:
           SAFETY_API_KEY: ${{ secrets.SAFETY_API_KEY }}
         run: |
-          # Use 'safety scan' and ignore specific ecdsa vulnerabilities
-          # The command should now run non-interactively
-          safety scan -r requirements.txt --ignore=64459 --ignore=64396
+          # Usa 'safety check' (em vez de scan) com os flags '-i'
+          # 'safety check' respeita os flags de ignore locais.
+          safety check -r requirements.txt -i 64459 -i 64396
       
       # --- ETAPA DE TESTE ATUALIZADA ---
       
