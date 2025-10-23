@@ -62,6 +62,10 @@ jobs:
       # --- ETAPA DE TESTE ATUALIZADA ---
       
       - name: Run Pytest with Coverage
+        # --- ADICIONE ESTE BLOCO 'env' ---
+        env:
+          PYTHONPATH: .
+        # --- FIM DA ADIÇÃO ---
         run: |
           # Roda os testes, medindo a cobertura do diretório 'app'
           # Falha o build se a cobertura for menor que 80%
