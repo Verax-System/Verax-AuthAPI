@@ -44,6 +44,9 @@ Este design oferece flexibilidade total, permitindo que qualquer sistema utilize
 * ✅ **Fluxo de Tokens (JWT):** Login com `access_token` e `refresh_token` (com rotação).
 * ✅ **Claims JWT Padrão OIDC:** Tokens incluem `iss`, `aud`, `sub`, `iat`, `exp`, `email`, `email_verified`, `name` e `amr` (Authentication Methods Reference).
 * ✅ **Autenticação de Múltiplos Fatores (MFA/TOTP):**
+    * O utilizador insere o código de 6 dígitos da app e chama `POST /api/v1/auth/mfa/confirm` com o `otp_code`.
+    * A API verifica o código OTP contra o segredo pendente. Se válido, marca `is_mfa_enabled = True`, gera 10 códigos de recuperação de uso único, guarda os seus hashes, e retorna o           utilizador atualizado juntamente com os **códigos de recuperação em texto simples**.
+    * Mostra os códigos de recuperação ao utilizador **APENAS NESTA ALTURA**, instruindo-o a guardá-los num local seguro.
     * Fluxo completo para Habilitar, Confirmar e Desabilitar MFA (via Google Authenticator, Authy, etc.).
     * Geração de QR Code (Base64) e URI `otpauth://`.
     * Verificação MFA (2-step) no login, retornando um `mfa_challenge_token`.
