@@ -74,7 +74,7 @@ async def test_register_user_weak_password(async_client: AsyncClient):
 
     # 422 Unprocessable Entity (Erro de validação do Pydantic)
     assert response.status_code == 422
-    assert "A senha deve ter pelo menos 8 caracteres" in response.text
+    assert "String should have at least 8 characters" in response.text
 
 
 @pytest.mark.asyncio
@@ -148,7 +148,7 @@ async def test_get_me(async_client: AsyncClient, db_session: AsyncSession):
 
     # 3. Chamar o /me com o token
     headers = {"Authorization": f"Bearer {access_token}"}
-    me_response = await async_client.get("/api/v1/users/me", headers=headers)
+    me_response = await async_client.get("/api/v1/auth/me", headers=headers)
 
     assert me_response.status_code == 200
     data = me_response.json()

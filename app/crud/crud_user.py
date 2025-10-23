@@ -128,8 +128,22 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             if user.failed_login_attempts >= settings.LOGIN_MAX_FAILED_ATTEMPTS:
                 lock_duration = timedelta(minutes=settings.LOGIN_LOCKOUT_MINUTES)
                 user.locked_until = now + lock_duration
-                # Não zerar tentativas aqui, apenas no login sucesso
-                logger.warning(f"CONTA BLOQUEADA: {email} por {lock_duration}.")
+                user.failed_login_attempts = (
+                    0  # Esta linha está correta, reseta após bloquear
+                )
+                logger.warning(
+                    f"CONTA BLOQUEADA: {email} bloqueada por {lock_duration} devido a tentativas falhas."
+                )
+
+                # --- ADICIONE AS 3 LINHAS ABAIXO ---
+                db.add(user)
+                await db.commit()
+                raise AccountLockedException(
+                    f"Account locked until {user.locked_until}",
+                    locked_until=user.locked_until,
+                )
+                # --- FIM DA ADIÇÃO ---
+
             db.add(user)
             await db.commit()
             return None
