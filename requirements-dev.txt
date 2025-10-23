@@ -9,4 +9,3 @@ pytest-asyncio
 aiosqlite
 types-passlib   
 types-python-jose
-httpx[fastapi]

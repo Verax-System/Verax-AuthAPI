@@ -4,7 +4,7 @@ import pytest
 # import asyncio # <-- REMOVIDO F401
 from typing import AsyncGenerator
 
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from app.db.base import Base
 from main import app
@@ -60,7 +60,7 @@ async def async_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, 
 
     app.dependency_overrides[get_db] = override_get_db
 
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        yield client
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+     yield client
 
     app.dependency_overrides.pop(get_db, None)

@@ -29,7 +29,7 @@ idna==3.11
 # pip install aiomysql
 # pip install aiosqlite
 # --- FIM REMOÇÃO ---
-httpx==0.28.1 # <-- PINNED
+httpx[asgi] # <-- ALTERE ESTA LINHA
 limits==5.6.0
 loguru==0.7.3
 lxml==6.0.2
