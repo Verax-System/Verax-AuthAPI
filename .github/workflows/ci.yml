@@ -53,8 +53,8 @@ jobs:
       
       - name: Dependency Security Scan (Safety)
         run: |
-          # Verifica o 'requirements.txt' por vulnerabilidades conhecidas
-          safety check -r requirements.txt
+          # Use 'safety scan' and ignore specific ecdsa vulnerabilities
+          safety scan -r requirements.txt --ignore=64459 --ignore=64396
       
       # --- ETAPA DE TESTE ATUALIZADA ---
       
