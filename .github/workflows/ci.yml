@@ -66,14 +66,16 @@ jobs:
           # Corrige o "Module not found"
           PYTHONPATH: .
           
-          # --- ADICIONE ESTAS VARIÁVEIS ---
-          # Pega a URL do conftest para satisfazer a validação
+          # Variáveis dummy para o config.py
           DATABASE_URL: "sqlite+aiosqlite:///./test.db"
           SECRET_KEY: "dummy_test_key"
           REFRESH_SECRET_KEY: "dummy_test_refresh_key"
           SENDGRID_API_KEY: "dummy_sendgrid"
           EMAIL_FROM: "test@example.com"
           INTERNAL_API_KEY: "dummy_internal_key"
+          
+          # --- ADICIONE ESTA LINHA ---
+          RUNNING_TESTS: "true" # Desativa o SlowAPI
           
         run: |
           # Roda os testes, medindo a cobertura do diretório 'app'
