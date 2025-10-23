@@ -110,5 +110,7 @@ async def prune_expired_tokens(db: AsyncSession) -> int:
     result: Result = await db.execute(stmt)  # Adicionar type hint para Result
     await db.commit()
     # CORRIGIDO: Acessar rowcount
-    row_count = result.rowcount # Número de linhas deletadas  # type: ignore [attr-defined]
+    row_count = (
+        result.rowcount
+    )  # Número de linhas deletadas  # type: ignore [attr-defined]
     return row_count if row_count is not None else 0  # rowcount pode ser None
