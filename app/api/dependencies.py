@@ -3,13 +3,12 @@ from fastapi import Depends, HTTPException, status
 # IMPORTAR HTTPBearer e HTTPAuthorizationCredentials
 from fastapi.security import OAuth2PasswordBearer, APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import AsyncGenerator
+# from typing import AsyncGenerator # <-- REMOVIDO
 import secrets # Importar secrets para comparação segura
 
 # Remover import do logger
-# from loguru import logger 
+# from loguru import logger
 
-from app.core import security
 # --- CORRECTION HERE: Remove AsyncSessionLocal import ---
 from app.db.session import get_db # Keep get_db import
 # --- END CORRECTION ---
@@ -18,7 +17,7 @@ from app.crud.crud_user import user as crud_user
 from app.core.config import settings # Importar settings
 
 # Define oauth2_scheme (ISTO SERÁ USADO APENAS PELO ENDPOINT /token)
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token") 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
 
 # --- NOVO ESQUEMA BEARER ---
 # Este esquema será usado por TODOS os endpoints protegidos
@@ -53,10 +52,10 @@ async def get_current_user_from_token(
             detail="Esquema de autorização inválido. Use 'Bearer'.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     # credentials.credentials é o token
     token = creds.credentials
-    
+
     # --- LOG DE DEBUG REMOVIDO ---
     # logger.debug(f"Recebido para decodificação - Scheme: '{creds.scheme}', Token: '{token}'")
     # --- FIM LOG DE DEBUG ---
@@ -104,13 +103,13 @@ async def get_current_admin_user(
         raise forbidden_exception
 
     roles = current_user.custom_claims.get("roles")
-    
+
     if not roles or not isinstance(roles, list) or "admin" not in roles:
         # Se 'roles' não existir,
         # ou não for uma lista,
         # ou 'admin' não estiver na lista
         raise forbidden_exception
-        
+
     return current_user
 # --- FIM NOVA DEPENDÊNCIA ---
 

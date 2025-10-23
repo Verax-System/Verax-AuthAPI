@@ -1,7 +1,7 @@
 # auth_api/app/services/email_service.py
-import asyncio
+# import asyncio # <-- REMOVIDO F401
 import traceback
-from typing import Dict, Any
+# from typing import Dict, Any # <-- REMOVIDO F401
 from loguru import logger
 from sendgrid.helpers.mail import Mail, From, To, Content
 from app.core.config import settings
@@ -46,9 +46,8 @@ async def send_email_http_api(
 
     try:
         # 3. Criar um transporte que USA EXPLICITAMENTE os certificados do certifi
-        # Esta é a correção definitiva para [SSL: CERTIFICATE_VERIFY_FAILED]
         transport = httpx.AsyncHTTPTransport(verify=certifi.where())
-        
+
         async with httpx.AsyncClient(transport=transport) as client:
             logger.info(f"Enviando email para {email_to} via HTTpx (com certifi)...")
             response = await client.post(
@@ -58,7 +57,6 @@ async def send_email_http_api(
             )
 
         # 4. Processar a resposta do httpx
-        # A API v3 do SendGrid retorna 202 Accepted em caso de sucesso
         if 200 <= response.status_code < 300:
             logger.info(f"Email aceito para envio para {email_to} via SendGrid. Status: {response.status_code}")
             return True

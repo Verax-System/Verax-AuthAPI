@@ -1,4 +1,4 @@
-import os
+# import os # <-- REMOVIDO F401
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,7 +37,7 @@ async def test_account_lockout(async_client: AsyncClient, db_session: AsyncSessi
     ele apenas verifica se o bloqueio é ATIVADO.
     """
     await setup_active_user(async_client, db_session)
-    
+
     print(f"Testando bloqueio após {MAX_ATTEMPTS} tentativas...")
 
     # Tentar logar com senha errada MAX_ATTEMPTS vezes
@@ -60,7 +60,7 @@ async def test_account_lockout(async_client: AsyncClient, db_session: AsyncSessi
         "username": EMAIL,
         "password": PASSWORD
     })
-    
+
     # Deve falhar, pois a conta está bloqueada
     assert final_response.status_code == 400
     assert "Account locked" in final_response.json()["detail"]
@@ -69,7 +69,7 @@ async def test_account_lockout(async_client: AsyncClient, db_session: AsyncSessi
 async def test_login_resets_failed_attempts(async_client: AsyncClient, db_session: AsyncSession):
     """Testa se um login bem-sucedido zera as tentativas falhas."""
     user_id = await setup_active_user(async_client, db_session)
-    
+
     # Tentar logar com senha errada (menos que o MAX)
     for _ in range(MAX_ATTEMPTS - 1):
         await async_client.post("/api/v1/auth/token", data={
@@ -80,14 +80,14 @@ async def test_login_resets_failed_attempts(async_client: AsyncClient, db_sessio
     # Verificar no BD que as tentativas falhas foram registradas
     user = await db_session.get(User, user_id)
     assert user.failed_login_attempts == MAX_ATTEMPTS - 1
-    
+
     # Logar com sucesso
     login_response = await async_client.post("/api/v1/auth/token", data={
         "username": EMAIL,
         "password": PASSWORD
     })
     assert login_response.status_code == 200
-    
+
     # Verificar no BD se as tentativas foram zeradas
     await db_session.refresh(user) # Recarregar dados do BD
     assert user.failed_login_attempts == 0

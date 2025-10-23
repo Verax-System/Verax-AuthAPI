@@ -1,10 +1,14 @@
 # auth_api/app/models/refresh_token.py
-from sqlalchemy import String, DateTime, func, ForeignKey, Integer, Boolean, Index
+from sqlalchemy import String, DateTime, func, ForeignKey, Boolean, Index
+# from sqlalchemy import Integer # <-- REMOVIDO F401
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from app.db.base import Base
-from .user import User # Importa o modelo User
+
+if TYPE_CHECKING:
+    from .user import User # Importa o modelo User para type hints
 
 class RefreshToken(Base):
     __tablename__ = "refresh_tokens"

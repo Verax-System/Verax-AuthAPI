@@ -4,6 +4,9 @@ from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import delete # Import delete
+from sqlalchemy.exc import IntegrityError # <-- MOVIDO PARA O TOPO E402
+from fastapi import HTTPException # <-- MOVIDO PARA O TOPO E402
+# from typing import Optional # <-- REMOVIDO F401
 
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
@@ -24,9 +27,9 @@ async def create_refresh_token(
         stmt_delete = delete(RefreshToken).where(
             RefreshToken.user_id == user.id,
             # Opcional: só deletar os não revogados? Depende da sua lógica.
-            # RefreshToken.is_revoked == False
+            # not RefreshToken.is_revoked
         )
-        result = await db.execute(stmt_delete)
+        await db.execute(stmt_delete) # <-- REMOVIDA VARIÁVEL 'result' F841
         # logger.info(f"Removed {result.rowcount} existing refresh token(s) for user ID {user.id}") # Optional logging
     except Exception as e:
         logger.error(f"Error removing old refresh tokens for user ID {user.id}: {e}")
@@ -68,7 +71,7 @@ async def get_refresh_token(db: AsyncSession, *, token: str) -> RefreshToken | N
 
     stmt = select(RefreshToken).where(
         RefreshToken.token_hash == token_hash_value,
-        RefreshToken.is_revoked == False,
+        not RefreshToken.is_revoked, # <-- CORRIGIDO E712
         RefreshToken.expires_at > now_utc_naive # Compare naive datetimes
     )
     result = await db.execute(stmt)
@@ -92,7 +95,10 @@ async def revoke_refresh_token(db: AsyncSession, *, token: str) -> bool:
 
 async def revoke_all_refresh_tokens_for_user(db: AsyncSession, *, user_id: int) -> int:
     """Revoga todos os refresh tokens de um usuário (ex: ao trocar senha)."""
-    stmt = select(RefreshToken).where(RefreshToken.user_id == user_id, RefreshToken.is_revoked == False)
+    stmt = select(RefreshToken).where(
+        RefreshToken.user_id == user_id,
+        not RefreshToken.is_revoked # <-- CORRIGIDO E712
+    )
     result = await db.execute(stmt)
     tokens = result.scalars().all()
     count = 0
@@ -112,7 +118,4 @@ async def prune_expired_tokens(db: AsyncSession) -> int:
     await db.commit()
     return result.rowcount # Número de linhas deletadas
 
-# Add IntegrityError to imports if not already there
-from sqlalchemy.exc import IntegrityError
-from fastapi import HTTPException
-from typing import Optional # Add Optional if needed at top
+# Imports movidos para o topo

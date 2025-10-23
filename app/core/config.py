@@ -1,5 +1,4 @@
 # auth_api/app/core/config.py
-import os
 import logging
 from pydantic_settings import BaseSettings
 from pydantic import EmailStr

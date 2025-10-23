@@ -1,10 +1,10 @@
 # auth_api/main.py
-from fastapi import FastAPI, Request, Depends
+from fastapi import FastAPI, Depends # <-- Request REMOVIDO
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+# from fastapi.responses import JSONResponse # <-- REMOVIDO
 # --- Imports de Segurança ---
 # IMPORTAR HTTPBearer
-from fastapi.security import OAuth2PasswordBearer, APIKeyHeader, HTTPBearer
+# from fastapi.security import OAuth2PasswordBearer, APIKeyHeader, HTTPBearer # <-- REMOVIDOS
 # --- Fim Imports ---
 
 # --- Adicionar imports do slowapi ---
@@ -17,11 +17,12 @@ from app.db.session import dispose_engine
 # Importar routers
 from app.api.endpoints import auth, users, mgmt
 # Importar dependência de chave de API E OS NOVOS ESQUEMAS
+# E os esquemas de segurança que SÃO usados
 from app.api.dependencies import get_api_key, oauth2_scheme, bearer_scheme, api_key_scheme
 
 # Importar modelos para Alembic/Base.metadata
 from app.db.base import Base # noqa
-from app.models import user, refresh_token # noqa
+from app.models import user, refresh_token, mfa_recovery_code # noqa
 
 # --- REMOVER DEFINIÇÕES DE ESQUEMAS DAQUI ---
 # Elas agora são importadas de 'dependencies.py'
@@ -41,11 +42,11 @@ app = FastAPI(
     openapi_components={
         "securitySchemes": {
             # 1. Para o /token (fluxo de senha)
-            "OAuth2PasswordBearer": oauth2_scheme, 
+            "OAuth2PasswordBearer": oauth2_scheme,
             # 2. NOVO: Para os endpoints com cadeado (colar o token)
             "BearerAuth": bearer_scheme,
             # 3. Para o /mgmt
-            "APIKeyHeader": api_key_scheme        
+            "APIKeyHeader": api_key_scheme
         }
     }
     # --- Fim OpenAPI ---
@@ -72,39 +73,25 @@ app.add_middleware(
 api_prefix = "/api/v1"
 
 # --- Router de Autenticação ---
-# Alguns endpoints são públicos (/token, /verify-email, etc.)
-# Outros requerem Bearer token (/me, /mfa/...)
-# Adicionamos a dependência global do oauth2_scheme aqui, mas endpoints específicos
-# como /token não o usarão diretamente. A proteção real vem das dependências
-# como get_current_active_user dentro dos endpoints.
 app.include_router(
     auth.router,
     prefix=f"{api_prefix}/auth",
     tags=["Authentication"],
-    # REMOVA a dependência do router
-    # dependencies=[Depends(oauth2_scheme)] # <-- REMOVA ESTA LINHA
 )
 
 # --- Router de Usuários ---
-# POST / é público, mas GET /, GET /{id}, PUT /me requerem autenticação.
-# GET / e GET /{id} também requerem admin (verificado dentro do endpoint).
 app.include_router(
     users.router,
     prefix=f"{api_prefix}/users",
     tags=["Users"],
-    # REMOVA a dependência do router
-    # dependencies=[Depends(oauth2_scheme)] # <-- REMOVA ESTA LINHA
 )
 
 # --- Router de Gerenciamento ---
-# Protegido APENAS pela chave de API
 app.include_router(
     mgmt.router,
     prefix=f"{api_prefix}/mgmt",
     tags=["Management"],
-    # A dependência get_api_key já usa o api_key_scheme internamente
     dependencies=[Depends(get_api_key)],
-    # NÃO associar ao oauth2_scheme aqui
 )
 
 

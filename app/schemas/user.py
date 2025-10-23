@@ -1,5 +1,6 @@
 # auth_api/app/schemas/user.py
-from pydantic import BaseModel, EmailStr, Field, validator, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator # <-- validator REMOVIDO
+# from pydantic import validator # <-- REMOVIDO F401
 from typing import Optional, Dict, Any, List # Importar List
 from datetime import datetime
 import re
@@ -70,7 +71,7 @@ class MFAEnableResponse(BaseModel):
     """Resposta ao iniciar a habilitação do MFA."""
     # otp_secret: str # REMOVIDO por segurança - será guardado temporariamente
     otp_uri: str    # A URI para gerar o QR Code
-    qr_code_base64: str # A imagem do QR Code em base64 
+    qr_code_base64: str # A imagem do QR Code em base64
 
 
 

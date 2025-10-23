@@ -16,7 +16,7 @@ from loguru import logger
 # Quantos códigos gerar
 NUMBER_OF_RECOVERY_CODES = 10
 # Formato do código (ex: abc-123)
-RECOVERY_CODE_LENGTH = 3 
+RECOVERY_CODE_LENGTH = 3
 
 def generate_plain_recovery_codes() -> List[str]:
     """Gera uma lista de códigos de recuperação legíveis."""
@@ -39,7 +39,7 @@ async def create_recovery_codes(
 
     # 2. Gerar novos códigos em texto simples
     plain_codes = generate_plain_recovery_codes()
-    
+
     # 3. Criar os objetos do modelo com os hashes
     db_codes = []
     for code in plain_codes:
@@ -51,13 +51,13 @@ async def create_recovery_codes(
                 is_used=False
             )
         )
-    
+
     # 4. Adicionar à sessão e fazer commit
     db.add_all(db_codes)
     await db.commit()
-    
+
     logger.info(f"Gerados {len(plain_codes)} novos códigos de recuperação para o user ID {user.id}")
-    
+
     # 5. Retornar os códigos em texto simples (para mostrar ao utilizador)
     return plain_codes
 
@@ -67,7 +67,7 @@ async def delete_all_codes_for_user(db: AsyncSession, *, user_id: int) -> int:
     result = await db.execute(stmt)
     # Não precisa de commit() aqui se for chamado por outra função que faz commit
     # Mas se for chamado sozinho, precisa. Adicionamos por segurança.
-    await db.commit() 
+    await db.commit()
     return result.rowcount
 
 async def get_valid_recovery_code(
@@ -80,7 +80,7 @@ async def get_valid_recovery_code(
     # (Não podemos fazer query pelo hash, pois o plain_code não gera o mesmo hash sempre)
     stmt = select(MFARecoveryCode).where(
         MFARecoveryCode.user_id == user.id,
-        MFARecoveryCode.is_used == False
+        not MFARecoveryCode.is_used # <-- CORRIGIDO E712
     )
     result = await db.execute(stmt)
     unused_codes = result.scalars().all()
@@ -90,7 +90,7 @@ async def get_valid_recovery_code(
         # Usar a mesma verificação da senha
         if verify_password(plain_code, db_code.hashed_code):
             return db_code # Encontrado!
-            
+
     # 3. Se o loop terminar, nenhum código válido foi encontrado
     return None
 

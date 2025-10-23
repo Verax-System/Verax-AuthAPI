@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 from .config import settings
-import secrets
+# import secrets # <-- REMOVIDO
 # Import UserModel QUALIFICADO para evitar conflito de nome 'User'
 from app.models.user import User as UserModel
 # --- NOVOS IMPORTS MFA ---
@@ -33,7 +33,7 @@ def get_password_hash(password: str) -> str:
     # Limita o tamanho da senha ANTES de passar para o bcrypt
     password_bytes = password.encode('utf-8')[:72]
     return pwd_context.hash(password_bytes)
-    
+
 # --- NOVAS FUNÇÕES HELPER PARA RECOVERY CODES ---
 # Reutilizar as funções de senha para os códigos de recuperação
 def verify_recovery_code(plain_code: str, hashed_code: str) -> bool:
@@ -88,7 +88,7 @@ def decode_access_token(token: str) -> Dict | None:
             settings.SECRET_KEY,
             algorithms=[settings.ALGORITHM],
             audience=settings.JWT_AUDIENCE,
-            issuer=settings.JWT_ISSUER, 
+            issuer=settings.JWT_ISSUER,
             options={"verify_iss": True, "verify_aud": True}
         )
         return payload
@@ -114,7 +114,7 @@ def decode_refresh_token(token: str) -> Dict | None:
             token,
             settings.REFRESH_SECRET_KEY,
             algorithms=[settings.ALGORITHM],
-            issuer=settings.JWT_ISSUER, 
+            issuer=settings.JWT_ISSUER,
             options={"verify_iss": True, "verify_aud": False}
         )
         if payload.get("token_type") != "refresh":
@@ -148,7 +148,7 @@ def decode_password_reset_token(token: str) -> Dict | None:
             reset_secret,
             algorithms=[settings.ALGORITHM],
             audience=settings.JWT_AUDIENCE,
-            issuer=settings.JWT_ISSUER, 
+            issuer=settings.JWT_ISSUER,
             options={"verify_iss": True, "verify_aud": True}
         )
         if payload.get("token_type") != "password_reset" or "sub" not in payload:
@@ -179,7 +179,7 @@ def verify_otp_code(secret: str, code: str) -> bool:
     Verifica se um código OTP é válido para o segredo fornecido.
     Permite uma pequena janela de tempo para sincronização.
     """
-    if not secret: 
+    if not secret:
         return False
     totp = pyotp.TOTP(secret)
     return totp.verify(code, valid_window=1)
