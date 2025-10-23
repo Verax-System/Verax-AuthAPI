@@ -121,7 +121,7 @@ async def test_logout(async_client: AsyncClient, db_session: AsyncSession):
     """Testa o endpoint de logout revogando o refresh token."""
     _, refresh_token, user_id = await create_and_login_user(async_client, db_session)
 
-    refresh_hash = hash_token(refresh_token)  # Use the correctly imported function
+    refresh_hash = hash_token(refresh_token)
 
     # Verificar que o token existe e não está revogado antes do logout
     stmt_before = select(RefreshToken).where(RefreshToken.token_hash == refresh_hash)
@@ -136,18 +136,21 @@ async def test_logout(async_client: AsyncClient, db_session: AsyncSession):
     )
     assert logout_response.status_code == 204  # No Content
 
-    # Verificar no BD se o token foi marcado como revogado
-    # Nota: A implementação atual DELETA o token ao criar um novo, mas o logout APENAS revoga.
-    # Precisamos buscar novamente.
-    await db_session.expire(
-        db_token_before
-    )  # Força o SQLAlchemy a buscar do BD de novo
-    stmt_after = select(RefreshToken).where(RefreshToken.token_hash == refresh_hash)
-    result_after = await db_session.execute(stmt_after)
-    db_token_after = result_after.scalars().first()
+    # --- SIMPLIFICAR A VERIFICAÇÃO PÓS-LOGOUT ---
+    # Verificar no BD se o token foi marcado como revogado, usando refresh
+    # Garante que o objeto ainda está na sessão antes de tentar o refresh
+    if db_token_before in db_session:
+        await db_session.refresh(db_token_before)
+    else:
+        # Se por algum motivo saiu da sessão (improvável aqui), busque novamente
+        result_after_refresh = await db_session.execute(
+            stmt_before
+        )  # Reusa o stmt_before
+        db_token_before = result_after_refresh.scalars().first()
 
-    assert db_token_after is not None  # Ele ainda existe
-    assert db_token_after.is_revoked is True  # Mas está revogado
+    assert db_token_before is not None  # Deve existir
+    assert db_token_before.is_revoked is True  # Agora deve estar revogado
+    # --- FIM DA SIMPLIFICAÇÃO ---
 
     # Tentar usar o refresh token revogado (deve falhar)
     refresh_response_revoked = await async_client.post(

@@ -61,7 +61,8 @@ class User(UserBase):
     created_at: datetime
     updated_at: datetime
     custom_claims: Optional[Dict[str, Any]] = None
-    is_mfa_enabled: bool  # Adicionado para ver o status
+    is_mfa_enabled: bool
+    is_verified: bool  # <-- ADICIONE ESTA LINHA
 
     class Config:
         from_attributes = True
