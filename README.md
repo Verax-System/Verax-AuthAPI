@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/FastAPI-0.119.1-teal.svg?style=for-the-badge&logo=fastapi" alt="FastAPI">
   <img src="https://img.shields.io/badge/Axum-0.8.6-black.svg?style=for-the-badge" alt="Axum">
   <a href="https://github.com/SEU_USUARIO/SEU_REPOSITORIO/blob/main/LICENSE" target="_blank">
-      <img src="https://img.shields.io/github/license/SEU_USUARIO/SEU_REPOSITORIO?style=for-the-badge&color=brightgreen" alt="License">
+      <img src="https://img.shields.io/github/license/Verax-System/Verax-AuthAPI?style=for-the-badge&color=brightgreen" alt="License">
   </a>
 </p>
 
@@ -401,4 +401,4 @@ Proteção: Requer o `INTERNAL_API_KEY` no header `X-API-Key`.
 `PATCH /users/{id_ou_email}/claims`: Mescla (Atualiza) os `custom_claims` de um usuário.
 
 # 📜 Licença
-Este projeto está licenciado sob a Licença MIT. Veja o arquivo `LICENSE` para mais detalhes.
+Este projeto está licenciado sob a Licença MIT. Veja o arquivo [`LICENSE`](https://github.com/Verax-System/Verax-AuthAPI/blob/master/LICENSE) para mais detalhes.
