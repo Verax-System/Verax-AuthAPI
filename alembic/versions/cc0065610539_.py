@@ -1,18 +1,18 @@
-"""Versão inicial com tabelas users e refresh_tokens
+"""empty message
 
-Revision ID: 72954e6f3073
+Revision ID: cc0065610539
 Revises: 
-Create Date: 2025-10-22 16:23:37.900668
+Create Date: 2025-10-23 15:41:17.784281
 
 """
 from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+
 
 # revision identifiers, used by Alembic.
-revision: str = '72954e6f3073'
+revision: str = 'cc0065610539'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -34,7 +34,9 @@ def upgrade() -> None:
     sa.Column('reset_password_token_expires', sa.DateTime(), nullable=True),
     sa.Column('failed_login_attempts', sa.Integer(), nullable=False),
     sa.Column('locked_until', sa.DateTime(), nullable=True),
-    sa.Column('custom_claims', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('custom_claims', sa.JSON(), nullable=True),
+    sa.Column('otp_secret', sa.String(length=64), nullable=True),
+    sa.Column('is_mfa_enabled', sa.Boolean(), server_default='false', nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=False),
     sa.PrimaryKeyConstraint('id')

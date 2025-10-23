@@ -6,6 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import AsyncGenerator
 import secrets # Importar secrets para comparação segura
 
+# Remover import do logger
+# from loguru import logger 
+
 from app.core import security
 # --- CORRECTION HERE: Remove AsyncSessionLocal import ---
 from app.db.session import get_db # Keep get_db import
@@ -26,7 +29,6 @@ bearer_scheme = HTTPBearer(
 # --- FIM NOVO ESQUEMA ---
 
 # --- DEPENDÊNCIA DA CHAVE DE API (X-API-Key) ---
-# CORRIGIDO: O nome da variável agora é 'api_key_scheme' e inclui a descrição
 api_key_scheme = APIKeyHeader(name="X-API-Key", description="Chave de API para endpoints /mgmt")
 # --- FIM DEPENDÊNCIA ---
 
@@ -54,6 +56,10 @@ async def get_current_user_from_token(
     
     # credentials.credentials é o token
     token = creds.credentials
+    
+    # --- LOG DE DEBUG REMOVIDO ---
+    # logger.debug(f"Recebido para decodificação - Scheme: '{creds.scheme}', Token: '{token}'")
+    # --- FIM LOG DE DEBUG ---
 
     payload = security.decode_access_token(token)
     if payload is None:
@@ -110,7 +116,7 @@ async def get_current_admin_user(
 
 
 # --- DEPENDÊNCIA DA CHAVE DE API (X-API-Key) ---
-async def get_api_key(api_key: str = Depends(api_key_scheme)) -> str: # CORRIGIDO: usa api_key_scheme
+async def get_api_key(api_key: str = Depends(api_key_scheme)) -> str:
     """
     Verifica se a X-API-Key enviada no header é válida.
     """

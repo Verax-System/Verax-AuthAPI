@@ -14,6 +14,10 @@ import io
 import base64
 # --- FIM NOVOS IMPORTS ---
 
+# --- IMPORT DO LOGGER REMOVIDO ---
+# from loguru import logger
+# --- FIM IMPORT ---
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # ... (verify_password, get_password_hash) ...
@@ -75,13 +79,14 @@ def decode_access_token(token: str) -> Dict | None:
             settings.SECRET_KEY,
             algorithms=[settings.ALGORITHM],
             audience=settings.JWT_AUDIENCE,
-            # --- CORREÇÃO AQUI ---
             issuer=settings.JWT_ISSUER, # Especifica o emissor esperado
-            # --- FIM CORREÇÃO ---
             options={"verify_iss": True, "verify_aud": True}
         )
         return payload
-    except JWTError:
+    except JWTError as e:
+        # --- LOG DE ERRO REMOVIDO ---
+        # logger.error(f"Erro ao decodificar Access Token: {e}")
+        # --- FIM LOG DE ERRO ---
         return None
 
 def create_refresh_token(data: Dict[str, Any]) -> tuple[str, datetime]:
@@ -102,15 +107,16 @@ def decode_refresh_token(token: str) -> Dict | None:
             token,
             settings.REFRESH_SECRET_KEY,
             algorithms=[settings.ALGORITHM],
-            # --- CORREÇÃO AQUI ---
             issuer=settings.JWT_ISSUER, # Especifica o emissor esperado
-            # --- FIM CORREÇÃO ---
             options={"verify_iss": True, "verify_aud": False}
         )
         if payload.get("token_type") != "refresh":
              return None
         return payload
-    except JWTError:
+    except JWTError as e:
+        # --- LOG DE ERRO REMOVIDO ---
+        # logger.error(f"Erro ao decodificar Refresh Token: {e}")
+        # --- FIM LOG DE ERRO ---
         return None
 
 # ... (create_password_reset_token, decode_password_reset_token) ...
@@ -122,7 +128,7 @@ def create_password_reset_token(email: str) -> tuple[str, datetime]:
         "iss": settings.JWT_ISSUER,
         "aud": settings.JWT_AUDIENCE,
         "exp": expire,
-        "nbf": datetime.now(timezone.utc),
+        "nfs": datetime.now(timezone.utc),
         "sub": email,
         "token_type": "password_reset"
     }
@@ -137,15 +143,16 @@ def decode_password_reset_token(token: str) -> Dict | None:
             reset_secret,
             algorithms=[settings.ALGORITHM],
             audience=settings.JWT_AUDIENCE,
-            # --- CORREÇÃO AQUI ---
             issuer=settings.JWT_ISSUER, # Especifica o emissor esperado
-            # --- FIM CORREÇÃO ---
             options={"verify_iss": True, "verify_aud": True}
         )
         if payload.get("token_type") != "password_reset" or "sub" not in payload:
              return None
         return payload
-    except JWTError:
+    except JWTError as e:
+        # --- LOG DE ERRO REMOVIDO ---
+        # logger.error(f"Erro ao decodificar Password Reset Token: {e}")
+        # --- FIM LOG DE ERRO ---
         return None
 
 # --- NOVAS FUNÇÕES MFA/OTP ---
@@ -171,7 +178,7 @@ def verify_otp_code(secret: str, code: str) -> bool:
     Verifica se um código OTP é válido para o segredo fornecido.
     Permite uma pequena janela de tempo para sincronização.
     """
-    if not secret: # Adiciona verificação se o segredo é nulo/vazio
+    if not secret: # Adiciona verificação se o segredo é nulo/Vazio
         return False
     totp = pyotp.TOTP(secret)
     # Verifica o código atual e o anterior/seguinte (janela de +/- 30s = 1 * 30s)
