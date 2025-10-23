@@ -7,7 +7,8 @@ import secrets
 from app.crud.base import CRUDBase
 from app.models.user import User
 from datetime import datetime, timedelta, timezone
-from app.schemas.user import UserCreate, UserUpdate, User as UserSchema # Importar UserSchema
+# from app.schemas.user import UserCreate, UserUpdate, User as UserSchema # <-- UserSchema REMOVIDO F401
+from app.schemas.user import UserCreate, UserUpdate # <-- UserSchema REMOVIDO F401
 from app.core.security import (
     get_password_hash, verify_password, create_password_reset_token,
     verify_otp_code
@@ -76,7 +77,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         stmt = select(User).where(
             User.verification_token_hash == token_hash,
             User.verification_token_expires > now,
-            User.is_verified == False # <-- CORRIGIDO: Voltar para == False
+            not User.is_verified # <-- CORRIGIDO E712
         )
         result = await db.execute(stmt)
         user = result.scalars().first()
@@ -222,7 +223,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         stmt = select(User).where(
             User.reset_password_token_hash == token_hash,
             User.reset_password_token_expires > now,
-            User.is_active == True # <-- CORRIGIDO: Voltar para == True
+            User.is_active # <-- CORRIGIDO E712
         )
         result = await db.execute(stmt)
         return result.scalars().first()

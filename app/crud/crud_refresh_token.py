@@ -56,7 +56,7 @@ async def get_refresh_token(db: AsyncSession, *, token: str) -> RefreshToken | N
 
     stmt = select(RefreshToken).where(
         RefreshToken.token_hash == token_hash_value,
-        RefreshToken.is_revoked == False, # <-- CORRIGIDO: Voltar para == False
+        not RefreshToken.is_revoked, # <-- CORRIGIDO E712
         RefreshToken.expires_at > now_utc_naive
     )
     result = await db.execute(stmt)
@@ -80,7 +80,7 @@ async def revoke_all_refresh_tokens_for_user(db: AsyncSession, *, user_id: int) 
     """Revoga todos os refresh tokens de um usuário."""
     stmt = select(RefreshToken).where(
         RefreshToken.user_id == user_id,
-        RefreshToken.is_revoked == False # <-- CORRIGIDO: Voltar para == False
+        not RefreshToken.is_revoked # <-- CORRIGIDO E712
     )
     result = await db.execute(stmt)
     tokens = result.scalars().all()

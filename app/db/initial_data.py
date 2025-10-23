@@ -1,7 +1,7 @@
 # auth_api/app/db/initial_data.py
 import asyncio
 import logging
-import os # Import os for the windows check
+# import os # <-- REMOVIDO F401
 import sys # Importar sys para checar plataforma
 
 # --- MOVIDOS PARA O TOPO E402 ---

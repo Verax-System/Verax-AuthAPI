@@ -65,7 +65,7 @@ async def get_valid_recovery_code(
     """
     stmt = select(MFARecoveryCode).where(
         MFARecoveryCode.user_id == user.id,
-        MFARecoveryCode.is_used == False # <-- CORRIGIDO: Voltar para == False
+        not MFARecoveryCode.is_used # <-- CORRIGIDO E712
     )
     result = await db.execute(stmt)
     unused_codes = result.scalars().all()
@@ -84,4 +84,4 @@ async def mark_code_as_used(
     db.add(db_code)
     await db.commit()
     await db.refresh(db_code)
-    return db_code
+    return db
