@@ -7,7 +7,7 @@ from typing import AsyncGenerator
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from app.db.base import Base
-from app.main import app
+from main import app
 from app.api.dependencies import get_db
 
 # --- CONFIGURAÇÃO DO BANCO DE DADOS DE TESTE ---
