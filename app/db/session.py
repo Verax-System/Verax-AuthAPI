@@ -48,7 +48,7 @@ def get_session_local() -> sessionmaker:
             expire_on_commit=False,
             autocommit=False,
             autoflush=False,
-        ) # type: ignore # Ignorar erro de overload do sessionmaker
+        )  # type: ignore # Ignorar erro de overload do sessionmaker
     return _AsyncSessionLocal
 
 

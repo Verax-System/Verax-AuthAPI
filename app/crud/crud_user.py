@@ -7,11 +7,14 @@ import secrets
 from app.crud.base import CRUDBase
 from app.models.user import User
 from datetime import datetime, timedelta, timezone
+
 # from app.schemas.user import UserCreate, UserUpdate, User as UserSchema # <-- UserSchema REMOVIDO F401
-from app.schemas.user import UserCreate, UserUpdate # <-- UserSchema REMOVIDO F401
+from app.schemas.user import UserCreate, UserUpdate  # <-- UserSchema REMOVIDO F401
 from app.core.security import (
-    get_password_hash, verify_password, create_password_reset_token,
-    verify_otp_code
+    get_password_hash,
+    verify_password,
+    create_password_reset_token,
+    verify_otp_code,
 )
 from app.crud import crud_refresh_token
 from app.crud import crud_mfa_recovery_code
@@ -42,28 +45,35 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
 
         logger.info(f"Criando novo utilizador via OAuth para: {email}")
         db_obj = User(
-            email=email, full_name=full_name, hashed_password=None,
-            is_active=True, is_verified=True, custom_claims={}
+            email=email,
+            full_name=full_name,
+            hashed_password=None,
+            is_active=True,
+            is_verified=True,
+            custom_claims={},
         )
         db.add(db_obj)
         await db.commit()
         await db.refresh(db_obj)
         return db_obj
 
-    async def create(self, db: AsyncSession, *, obj_in: UserCreate) -> tuple[User, str]: # type: ignore
+    async def create(self, db: AsyncSession, *, obj_in: UserCreate) -> tuple[User, str]:  # type: ignore
         """Cria usuário e retorna (usuário, token_verificação)."""
         verification_token = secrets.token_urlsafe(32)
-        token_hash = hashlib.sha256(verification_token.encode('utf-8')).hexdigest()
-        expires_delta = timedelta(minutes=settings.EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES)
+        token_hash = hashlib.sha256(verification_token.encode("utf-8")).hexdigest()
+        expires_delta = timedelta(
+            minutes=settings.EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES
+        )
         expires_at = datetime.now(timezone.utc) + expires_delta
         db_obj = User(
             email=obj_in.email,
             hashed_password=get_password_hash(obj_in.password),
             full_name=obj_in.full_name,
-            is_active=False, is_verified=False,
+            is_active=False,
+            is_verified=False,
             verification_token_hash=token_hash,
             verification_token_expires=expires_at.replace(tzinfo=None),
-            custom_claims={}
+            custom_claims={},
         )
         db.add(db_obj)
         await db.commit()
@@ -72,12 +82,12 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
 
     async def verify_user_email(self, db: AsyncSession, *, token: str) -> User | None:
         """Verifica email do usuário usando token."""
-        token_hash = hashlib.sha256(token.encode('utf-8')).hexdigest()
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         stmt = select(User).where(
             User.verification_token_hash == token_hash,
             User.verification_token_expires > now,
-            not User.is_verified # <-- CORRIGIDO E712
+            not User.is_verified,  # <-- CORRIGIDO E712
         )
         result = await db.execute(stmt)
         user = result.scalars().first()
@@ -92,7 +102,9 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             return user
         return None
 
-    async def authenticate(self, db: AsyncSession, *, email: str, password: str) -> Optional[User]:
+    async def authenticate(
+        self, db: AsyncSession, *, email: str, password: str
+    ) -> Optional[User]:
         """Autentica usuário, lida com lockout."""
         user = await self.get_by_email(db, email=email)
         if not user:
@@ -105,7 +117,10 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         if user.locked_until and user.locked_until > now:
             logger.warning(f"Tentativa de login para conta bloqueada: {email}")
-            raise AccountLockedException(f"Account locked until {user.locked_until}", locked_until=user.locked_until)
+            raise AccountLockedException(
+                f"Account locked until {user.locked_until}",
+                locked_until=user.locked_until,
+            )
 
         if not verify_password(password, user.hashed_password):
             user.failed_login_attempts += 1
@@ -123,20 +138,21 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             return None
 
         if user.failed_login_attempts > 0 or user.locked_until:
-            user.failed_login_attempts = 0 # Zerar no sucesso
+            user.failed_login_attempts = 0  # Zerar no sucesso
             user.locked_until = None
             db.add(user)
             await db.commit()
-            await db.refresh(user) # Recarregar para garantir estado atualizado
+            await db.refresh(user)  # Recarregar para garantir estado atualizado
 
         return user
 
-
-    async def update_custom_claims(self, db: AsyncSession, *, user: User, claims: Dict[str, Any]) -> User:
+    async def update_custom_claims(
+        self, db: AsyncSession, *, user: User, claims: Dict[str, Any]
+    ) -> User:
         """Atualiza custom_claims do usuário."""
         if user.custom_claims:
             if not isinstance(user.custom_claims, dict):
-                 user.custom_claims = {}
+                user.custom_claims = {}
             user.custom_claims.update(claims)
             flag_modified(user, "custom_claims")
         else:
@@ -146,11 +162,12 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         await db.refresh(user)
         return user
 
-
-    async def set_pending_otp_secret(self, db: AsyncSession, *, user: User, otp_secret: str) -> User:
+    async def set_pending_otp_secret(
+        self, db: AsyncSession, *, user: User, otp_secret: str
+    ) -> User:
         """Define segredo OTP pendente."""
         if user.is_mfa_enabled:
-             raise ValueError("MFA já está habilitado.")
+            raise ValueError("MFA já está habilitado.")
         user.otp_secret = otp_secret
         db.add(user)
         await db.commit()
@@ -171,7 +188,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
 
             plain_recovery_codes = await crud_mfa_recovery_code.create_recovery_codes(
                 db=db, user=user
-            ) # Commit já é feito dentro de create_recovery_codes
+            )  # Commit já é feito dentro de create_recovery_codes
 
             # Não precisa de commit aqui, mas refresh sim
             await db.refresh(user)
@@ -182,10 +199,12 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             logger.warning(f"Falha ao confirmar MFA (OTP inválido): User ID {user.id}")
             return None
 
-    async def disable_mfa(self, db: AsyncSession, *, user: User, otp_code: str) -> User | None:
+    async def disable_mfa(
+        self, db: AsyncSession, *, user: User, otp_code: str
+    ) -> User | None:
         """Desabilita MFA."""
         if not user.is_mfa_enabled or not user.otp_secret:
-            return user # Já está desabilitado ou sem segredo
+            return user  # Já está desabilitado ou sem segredo
 
         if verify_otp_code(secret=user.otp_secret, code=otp_code):
             user.otp_secret = None
@@ -194,21 +213,27 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
 
             rows_deleted = await crud_mfa_recovery_code.delete_all_codes_for_user(
                 db=db, user_id=user.id
-            ) # Commit já é feito dentro
-            logger.info(f"MFA desabilitado. Apagados {rows_deleted} códigos: User ID {user.id}")
+            )  # Commit já é feito dentro
+            logger.info(
+                f"MFA desabilitado. Apagados {rows_deleted} códigos: User ID {user.id}"
+            )
 
             # Commit final para user.is_mfa_enabled e otp_secret = None
             await db.commit()
             await db.refresh(user)
             return user
         else:
-            logger.warning(f"Falha ao desabilitar MFA (OTP inválido): User ID {user.id}")
+            logger.warning(
+                f"Falha ao desabilitar MFA (OTP inválido): User ID {user.id}"
+            )
             return None
 
-    async def generate_password_reset_token(self, db: AsyncSession, *, user: User) -> tuple[User, str]:
+    async def generate_password_reset_token(
+        self, db: AsyncSession, *, user: User
+    ) -> tuple[User, str]:
         """Gera token de reset de senha."""
         token, expires_at = create_password_reset_token(email=user.email)
-        token_hash = hashlib.sha256(token.encode('utf-8')).hexdigest()
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
         user.reset_password_token_hash = token_hash
         user.reset_password_token_expires = expires_at
         db.add(user)
@@ -216,19 +241,23 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         await db.refresh(user)
         return user, token
 
-    async def get_user_by_reset_token(self, db: AsyncSession, *, token: str) -> User | None:
+    async def get_user_by_reset_token(
+        self, db: AsyncSession, *, token: str
+    ) -> User | None:
         """Busca usuário por token de reset válido."""
-        token_hash = hashlib.sha256(token.encode('utf-8')).hexdigest()
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         stmt = select(User).where(
             User.reset_password_token_hash == token_hash,
             User.reset_password_token_expires > now,
-            User.is_active # <-- CORRIGIDO E712
+            User.is_active,  # <-- CORRIGIDO E712
         )
         result = await db.execute(stmt)
         return result.scalars().first()
 
-    async def reset_password(self, db: AsyncSession, *, user: User, new_password: str) -> User:
+    async def reset_password(
+        self, db: AsyncSession, *, user: User, new_password: str
+    ) -> User:
         """Redefine a senha do usuário e revoga tokens."""
         user.hashed_password = get_password_hash(new_password)
         user.reset_password_token_hash = None
@@ -238,10 +267,13 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         user.is_active = True
         db.add(user)
         # Revogar tokens ANTES do commit final da senha
-        revoked_count = await crud_refresh_token.revoke_all_refresh_tokens_for_user(db, user_id=user.id)
+        revoked_count = await crud_refresh_token.revoke_all_refresh_tokens_for_user(
+            db, user_id=user.id
+        )
         logger.info(f"Revogados {revoked_count} tokens: User ID {user.id}")
-        await db.commit() # Commit da nova senha e revogação
+        await db.commit()  # Commit da nova senha e revogação
         await db.refresh(user)
         return user
+
 
 user = CRUDUser(User)

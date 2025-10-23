@@ -1,12 +1,13 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
-from passlib.context import CryptContext # type: ignore
-from jose import jwt, JWTError # type: ignore
+from passlib.context import CryptContext  # type: ignore
+from jose import jwt, JWTError  # type: ignore
 from .config import settings
+
 # import secrets # <-- REMOVED
 from app.models.user import User as UserModel
-import pyotp # type: ignore
-import qrcode # type: ignore
+import pyotp  # type: ignore
+import qrcode  # type: ignore
 import io
 import base64
 from loguru import logger
