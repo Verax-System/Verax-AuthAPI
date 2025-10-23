@@ -1,13 +1,12 @@
 # tests/test_03_mfa_flows.py
-from select import select
+from sqlalchemy import func, select  # <-- ADD THIS IMPORT
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 import pyotp  # Para gerar códigos OTP nos testes
 import re
 
-from app.models.mfa_recovery_code import MFARecoveryCode
+from app.models.mfa_recovery_code import MFARecoveryCode  # Import model for select
 from app.models.user import User
 from app.crud import crud_mfa_recovery_code
 from app.core import security

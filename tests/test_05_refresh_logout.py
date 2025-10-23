@@ -9,6 +9,11 @@ from app.models.refresh_token import RefreshToken
 from app.core import security
 from sqlalchemy.future import select
 
+# --- FIX THE IMPORT PATH ---
+from app.crud.crud_refresh_token import hash_token  # Import from correct location
+# --- END FIX ---
+
+
 pytestmark = pytest.mark.asyncio
 
 TEST_EMAIL = "refresh@example.com"
@@ -86,19 +91,18 @@ async def test_refresh_token(async_client: AsyncClient, db_session: AsyncSession
     # O refresh token pode ou não ter um 'exp' maior, dependendo da implementação exata,
     # mas deve ser diferente do original se a rotação ocorreu.
 
-    # Verificar no BD se o refresh token ANTIGO foi revogado
-    old_refresh_hash = security.hash_token(
-        refresh_token
-    )  # Assumindo que você tem hash_token em security
+    # Verificar no BD se o refresh token ANTIGO foi revogado/deletado
+    old_refresh_hash = hash_token(refresh_token)  # Use the correctly imported function
     stmt_old = select(RefreshToken).where(RefreshToken.token_hash == old_refresh_hash)
     result_old = await db_session.execute(stmt_old)
     old_db_token = result_old.scalars().first()
-    # A implementação atual DELETA tokens antigos, então ele não deve ser encontrado
-    # Se a implementação APENAS revogasse, o assert seria: assert old_db_token.is_revoked is True
+    # A implementação atual DELETA tokens antigos ao criar um novo, então ele não deve ser encontrado
     assert old_db_token is None
 
     # Verificar se o NOVO refresh token existe no BD e não está revogado
-    new_refresh_hash = security.hash_token(new_refresh_token)
+    new_refresh_hash = hash_token(
+        new_refresh_token
+    )  # Use the correctly imported function
     stmt_new = select(RefreshToken).where(RefreshToken.token_hash == new_refresh_hash)
     result_new = await db_session.execute(stmt_new)
     new_db_token = result_new.scalars().first()
@@ -117,7 +121,7 @@ async def test_logout(async_client: AsyncClient, db_session: AsyncSession):
     """Testa o endpoint de logout revogando o refresh token."""
     _, refresh_token, user_id = await create_and_login_user(async_client, db_session)
 
-    refresh_hash = security.hash_token(refresh_token)
+    refresh_hash = hash_token(refresh_token)  # Use the correctly imported function
 
     # Verificar que o token existe e não está revogado antes do logout
     stmt_before = select(RefreshToken).where(RefreshToken.token_hash == refresh_hash)

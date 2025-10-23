@@ -2,15 +2,12 @@
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from unittest.mock import patch
+from unittest.mock import patch  # Keep patch
 import hashlib
 from datetime import datetime, timezone
 
 from app.models.user import User
-
-# REMOVIDO: from app.core.security import create_password_reset_token
-from app.core.security import get_password_hash  # Mantido
-# REMOVIDO: from app.core.config import settings
+from app.core.security import get_password_hash  # Keep this
 
 pytestmark = pytest.mark.asyncio
 
@@ -19,20 +16,25 @@ TEST_PASSWORD = "PasswordFlow123!"
 NEW_PASSWORD = "NewPasswordFlow456!"
 
 
-# Mock para evitar envio real de emails
+# --- FIX THE PATCH PATHS ---
 @pytest.fixture(autouse=True)
 def mock_email_service():
+    # Patch where the function is LOOKED UP when called by the endpoint
     with (
         patch(
-            "app.services.email_service.send_verification_email", return_value=True
+            "app.api.endpoints.users.send_verification_email", return_value=True
         ) as mock_verify,
         patch(
-            "app.services.email_service.send_password_reset_email", return_value=True
+            "app.api.endpoints.auth.send_password_reset_email", return_value=True
         ) as mock_reset,
     ):
         yield mock_verify, mock_reset
 
 
+# --- END FIX ---
+
+
+# ...(rest of the file remains the same)...
 async def test_email_verification_flow(
     async_client: AsyncClient, db_session: AsyncSession, mock_email_service
 ):
@@ -51,10 +53,12 @@ async def test_email_verification_flow(
     assert response.status_code == 201
     user_data = response.json()
     user_id = user_data["id"]
-    mock_verify.assert_called_once()  # Verifica se o mock foi chamado
-    verification_token = mock_verify.call_args[1][
-        "verification_token"
-    ]  # Pega o token do mock
+    mock_verify.assert_called_once()  # Now this should work
+    # Handle potential KeyError if call_args is empty (though assert_called_once should prevent this)
+    try:
+        verification_token = mock_verify.call_args[1]["verification_token"]
+    except (TypeError, KeyError, IndexError):
+        pytest.fail("Could not retrieve verification_token from mocked email call")
 
     # Verificar no BD que o usuário está inativo/não verificado
     user = await db_session.get(User, user_id)
@@ -125,8 +129,11 @@ async def test_password_reset_flow(
         "/api/v1/auth/forgot-password", json={"email": TEST_EMAIL}
     )
     assert forgot_response.status_code == 202
-    mock_reset.assert_called_once()
-    reset_token = mock_reset.call_args[1]["reset_token"]  # Pega o token do mock
+    mock_reset.assert_called_once()  # Now this should work
+    try:
+        reset_token = mock_reset.call_args[1]["reset_token"]  # Pega o token do mock
+    except (TypeError, KeyError, IndexError):
+        pytest.fail("Could not retrieve reset_token from mocked email call")
 
     # Verificar no BD se o hash do token foi salvo
     await db_session.refresh(user)
