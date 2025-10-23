@@ -54,7 +54,9 @@ async def delete_all_codes_for_user(db: AsyncSession, *, user_id: int) -> int:
     stmt = delete(MFARecoveryCode).where(MFARecoveryCode.user_id == user_id)
     result: Result = await db.execute(stmt)  # Adicionar type hint para Result
     await db.commit()
-    return result.rowcount  # Agora MyPy sabe que Result tem rowcount
+    # CORRIGIDO: Acessar rowcount
+    row_count = result.rowcount
+    return row_count if row_count is not None else 0  # rowcount pode ser None
 
 
 async def get_valid_recovery_code(
@@ -65,7 +67,8 @@ async def get_valid_recovery_code(
     """
     stmt = select(MFARecoveryCode).where(
         MFARecoveryCode.user_id == user.id,
-        not MFARecoveryCode.is_used,  # <-- CORRIGIDO E712
+        MFARecoveryCode.is_used
+        == False,  # <-- REVERTIDO: SQLAlchemy precisa de == False
     )
     result = await db.execute(stmt)
     unused_codes = result.scalars().all()
@@ -79,10 +82,10 @@ async def get_valid_recovery_code(
 
 async def mark_code_as_used(
     db: AsyncSession, *, db_code: MFARecoveryCode
-) -> MFARecoveryCode:
+) -> MFARecoveryCode:  # <-- CORRIGIDO: Retornar o objeto atualizado
     """Marca um código de recuperação específico como utilizado."""
     db_code.is_used = True
     db.add(db_code)
     await db.commit()
     await db.refresh(db_code)
-    return db
+    return db_code  # <-- CORRIGIDO: Retornar o db_code atualizado

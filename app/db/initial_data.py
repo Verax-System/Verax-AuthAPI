@@ -2,7 +2,7 @@
 import asyncio
 import logging
 
-# import os # <-- REMOVIDO F401
+# import os # <-- REMOVED F401
 import sys  # Importar sys para checar plataforma
 
 # --- MOVIDOS PARA O TOPO E402 ---

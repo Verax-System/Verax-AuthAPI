@@ -63,7 +63,8 @@ async def get_refresh_token(db: AsyncSession, *, token: str) -> RefreshToken | N
 
     stmt = select(RefreshToken).where(
         RefreshToken.token_hash == token_hash_value,
-        not RefreshToken.is_revoked,  # <-- CORRIGIDO E712
+        RefreshToken.is_revoked
+        == False,  # <-- REVERTIDO: SQLAlchemy precisa de == False
         RefreshToken.expires_at > now_utc_naive,
     )
     result = await db.execute(stmt)
@@ -89,7 +90,8 @@ async def revoke_all_refresh_tokens_for_user(db: AsyncSession, *, user_id: int) 
     """Revoga todos os refresh tokens de um usuário."""
     stmt = select(RefreshToken).where(
         RefreshToken.user_id == user_id,
-        not RefreshToken.is_revoked,  # <-- CORRIGIDO E712
+        RefreshToken.is_revoked
+        == False,  # <-- REVERTIDO: SQLAlchemy precisa de == False
     )
     result = await db.execute(stmt)
     tokens = result.scalars().all()
@@ -109,4 +111,6 @@ async def prune_expired_tokens(db: AsyncSession) -> int:
     stmt = delete(RefreshToken).where(RefreshToken.expires_at <= now_utc_naive)
     result: Result = await db.execute(stmt)  # Adicionar type hint para Result
     await db.commit()
-    return result.rowcount  # Agora MyPy sabe que Result tem rowcount
+    # CORRIGIDO: Acessar rowcount
+    row_count = result.rowcount
+    return row_count if row_count is not None else 0  # rowcount pode ser None
