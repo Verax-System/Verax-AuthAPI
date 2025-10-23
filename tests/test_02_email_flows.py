@@ -7,8 +7,10 @@ import hashlib
 from datetime import datetime, timezone
 
 from app.models.user import User
-from app.core.security import create_password_reset_token, get_password_hash
-from app.core.config import settings
+
+# REMOVIDO: from app.core.security import create_password_reset_token
+from app.core.security import get_password_hash  # Mantido
+# REMOVIDO: from app.core.config import settings
 
 pytestmark = pytest.mark.asyncio
 
