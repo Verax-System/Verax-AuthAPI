@@ -9,7 +9,7 @@ from app.models.user import User
 from datetime import datetime, timedelta, timezone
 
 # from app.schemas.user import UserCreate, UserUpdate, User as UserSchema # REMOVED F401
-from app.schemas.user import UserCreate, UserUpdate
+from app.schemas.user import UserCreate, UserUpdate  # <-- REMOVED UNUSED ALIAS F401
 from app.core.security import (
     get_password_hash,
     verify_password,
@@ -87,7 +87,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         stmt = select(User).where(
             User.verification_token_hash == token_hash,
             User.verification_token_expires > now,
-            User.is_verified == False,  # <-- REVERTIDO: SQLAlchemy precisa de == False
+            not User.is_verified,  # <-- CORRIGIDO E712 (para ruff)
         )
         result = await db.execute(stmt)
         user = result.scalars().first()
@@ -250,7 +250,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         stmt = select(User).where(
             User.reset_password_token_hash == token_hash,
             User.reset_password_token_expires > now,
-            User.is_active == True,  # <-- REVERTIDO: SQLAlchemy precisa de == True
+            User.is_active,  # <-- CORRIGIDO E712 (para ruff)
         )
         result = await db.execute(stmt)
         return result.scalars().first()
