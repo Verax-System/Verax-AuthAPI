@@ -1,5 +1,4 @@
 # auth_api/app/core/config.py
-import os
 import logging
 from pydantic_settings import BaseSettings
 from pydantic import EmailStr
@@ -8,8 +7,8 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 ENV_FILE_PATH = BASE_DIR / ".env"
 
-class Settings(BaseSettings):
 
+class Settings(BaseSettings):
     # Core
     DATABASE_URL: str
     SECRET_KEY: str
@@ -51,17 +50,22 @@ class Settings(BaseSettings):
     # URL do SEU frontend (para produção)
     GOOGLE_REDIRECT_URI_FRONTEND: str = "http://localhost:3000/google-callback"
     # URL do backend (usado apenas para testes locais da API)
-    GOOGLE_REDIRECT_URI_BACKEND: str = "http://localhost:8001/api/v1/auth/google/callback"
+    GOOGLE_REDIRECT_URI_BACKEND: str = (
+        "http://localhost:8001/api/v1/auth/google/callback"
+    )
 
     class Config:
         case_sensitive = True
         env_file = ENV_FILE_PATH
-        env_file_encoding = 'utf-8'
+        env_file_encoding = "utf-8"
+
 
 try:
     # AQUI é onde o settings é criado e exportado
-    settings = Settings()
+    settings = Settings()  # type: ignore [call-arg]
 except Exception as e:
-    logging.error(f"FATAL: Erro ao carregar 'settings' a partir do .env em {ENV_FILE_PATH}: {e}")
+    logging.error(
+        f"FATAL: Erro ao carregar 'settings' a partir do .env em {ENV_FILE_PATH}: {e}"
+    )
     # Se der erro aqui, o 'settings' não será criado, causando o ImportError
     raise e

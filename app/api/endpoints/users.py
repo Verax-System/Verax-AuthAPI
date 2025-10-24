@@ -1,25 +1,31 @@
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+
 # --- IMPORTAR A NOVA DEPENDÊNCIA DE ADMIN ---
 from app.api.dependencies import get_current_active_user, get_current_admin_user
+
 # --- FIM IMPORTAÇÃO ---
 from app.crud.crud_user import user as crud_user
 from app.db.session import get_db
 from app.schemas.user import User as UserSchema, UserCreate, UserUpdate
+
 # Importar dependência de autenticação do módulo auth
 from app.models.user import User as UserModel
-from app.services.email_service import send_verification_email # Importar serviço de email
-from fastapi import BackgroundTasks # Importar BackgroundTasks
+from app.services.email_service import (
+    send_verification_email,
+)  # Importar serviço de email
+from fastapi import BackgroundTasks  # Importar BackgroundTasks
 
 router = APIRouter()
+
 
 @router.post("/", response_model=UserSchema, status_code=status.HTTP_201_CREATED)
 async def create_user(
     *,
     db: AsyncSession = Depends(get_db),
     user_in: UserCreate,
-    background_tasks: BackgroundTasks # Adicionar BackgroundTasks
+    background_tasks: BackgroundTasks,  # Adicionar BackgroundTasks
 ) -> Any:
     """
     Cria um novo usuário (registro) e envia email de verificação.
@@ -38,12 +44,13 @@ async def create_user(
     background_tasks.add_task(
         send_verification_email,
         email_to=db_user.email,
-        verification_token=verification_token
+        verification_token=verification_token,
     )
     # --- Fim envio email ---
 
     # Retorna o usuário criado (sem o token)
     return db_user
+
 
 @router.get("/", response_model=List[UserSchema])
 async def read_users(
@@ -51,7 +58,7 @@ async def read_users(
     skip: int = 0,
     limit: int = 100,
     # --- ADICIONAR PROTEÇÃO DE ADMIN ---
-    admin_user: UserModel = Depends(get_current_admin_user)
+    admin_user: UserModel = Depends(get_current_admin_user),
     # --- FIM PROTEÇÃO ---
 ) -> Any:
     """
@@ -61,12 +68,13 @@ async def read_users(
     users = await crud_user.get_multi(db, skip=skip, limit=limit)
     return users
 
+
 @router.get("/{user_id}", response_model=UserSchema)
 async def read_user_by_id(
     user_id: int,
     db: AsyncSession = Depends(get_db),
     # --- ADICIONAR PROTEÇÃO DE ADMIN ---
-    admin_user: UserModel = Depends(get_current_admin_user)
+    admin_user: UserModel = Depends(get_current_admin_user),
     # --- FIM PROTEÇÃO ---
 ) -> Any:
     """
@@ -76,11 +84,12 @@ async def read_user_by_id(
     user = await crud_user.get(db, id=user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     # Futuramente, você poderia adicionar uma lógica aqui:
     # if admin_user.id == user.id or admin_user.is_admin: ...
     # Mas por enquanto, apenas admins podem ver outros usuários.
     return user
+
 
 @router.put("/me", response_model=UserSchema)
 async def update_user_me(

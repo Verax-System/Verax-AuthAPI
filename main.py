@@ -1,4 +1,5 @@
 # auth_api/main.py
+import os # <-- ADICIONADO
 from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -29,8 +30,15 @@ from app.models import user, refresh_token # noqa
 # api_key_scheme = ... (REMOVER)
 # --- FIM REMOÇÃO ---
 
+# --- MODIFICAÇÃO: Desabilitar o limiter em modo de teste ---
+IS_TESTING = os.environ.get("TESTING", "false").lower() == "true"
 
-limiter = Limiter(key_func=get_remote_address, default_limits=["10/minute"])
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["10/minute"],
+    enabled=not IS_TESTING # Desabilita se IS_TESTING for True
+)
+# --- FIM MODIFICAÇÃO ---
 
 app = FastAPI(
     title="Auth API",
@@ -53,7 +61,11 @@ app = FastAPI(
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-app.add_middleware(SlowAPIMiddleware)
+
+# --- MODIFICAÇÃO: SÓ ADICIONA O MIDDLEWARE SE NÃO ESTIVER TESTANDO ---
+if not IS_TESTING:
+    app.add_middleware(SlowAPIMiddleware)
+# --- FIM MODIFICAÇÃO ---
 
 origins = [
     "http://localhost:5173",

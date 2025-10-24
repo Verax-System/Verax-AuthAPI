@@ -3,15 +3,19 @@ import hashlib
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import delete # Import delete
+from sqlalchemy import delete, Result  # Importar Result
+from sqlalchemy.exc import IntegrityError
+from fastapi import HTTPException
+# from typing import Optional # REMOVED
 
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
-from loguru import logger # Add logger
+from loguru import logger
 
-# Função simples para gerar hash (poderia usar passlib se preferir consistência)
+
 def hash_token(token: str) -> str:
-    return hashlib.sha256(token.encode('utf-8')).hexdigest()
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
 
 async def create_refresh_token(
     db: AsyncSession, *, user: User, token: str, expires_at: datetime
@@ -19,60 +23,52 @@ async def create_refresh_token(
     """Cria e armazena o hash de um novo refresh token, removendo os antigos."""
     token_hash_value = hash_token(token)
 
-    # --- REMOVE EXISTING TOKENS FOR USER ---
     try:
-        stmt_delete = delete(RefreshToken).where(
-            RefreshToken.user_id == user.id,
-            # Opcional: só deletar os não revogados? Depende da sua lógica.
-            # RefreshToken.is_revoked == False
-        )
-        result = await db.execute(stmt_delete)
-        # logger.info(f"Removed {result.rowcount} existing refresh token(s) for user ID {user.id}") # Optional logging
+        stmt_delete = delete(RefreshToken).where(RefreshToken.user_id == user.id)
+        await db.execute(stmt_delete)
     except Exception as e:
         logger.error(f"Error removing old refresh tokens for user ID {user.id}: {e}")
-        # Decide if you want to raise an error or just log and continue
-        # raise HTTPException(status_code=500, detail="Could not clear old sessions.")
-    # --- END REMOVAL ---
 
     db_token = RefreshToken(
         user_id=user.id,
         token_hash=token_hash_value,
         expires_at=expires_at,
-        is_revoked=False
+        is_revoked=False,
     )
     db.add(db_token)
 
-    # --- COMMIT IS CRITICAL HERE ---
-    # We need to commit the delete and the insert together
     try:
         await db.commit()
         await db.refresh(db_token)
         return db_token
-    except IntegrityError as e: # Catch potential race conditions if logins are extremely concurrent
+    except IntegrityError as e:
         await db.rollback()
-        logger.error(f"Integrity error creating refresh token for user ID {user.id}: {e}")
-        # Maybe try fetching the existing token again or raise specific error
-        raise HTTPException(status_code=409, detail="Failed to create token due to conflict. Please try again.")
+        logger.error(
+            f"Integrity error creating refresh token for user ID {user.id}: {e}"
+        )
+        raise HTTPException(
+            status_code=409,
+            detail="Failed to create token due to conflict. Please try again.",
+        )
     except Exception as e:
         await db.rollback()
         logger.error(f"Generic error creating refresh token for user ID {user.id}: {e}")
         raise HTTPException(status_code=500, detail="Could not create refresh token.")
-    # --- END COMMIT ---
 
 
 async def get_refresh_token(db: AsyncSession, *, token: str) -> RefreshToken | None:
     """Busca um refresh token pelo seu valor (comparando hashes)."""
     token_hash_value = hash_token(token)
-    # Ensure comparison is timezone-naive if expires_at is naive
     now_utc_naive = datetime.now(timezone.utc).replace(tzinfo=None)
 
     stmt = select(RefreshToken).where(
         RefreshToken.token_hash == token_hash_value,
-        RefreshToken.is_revoked == False,
-        RefreshToken.expires_at > now_utc_naive # Compare naive datetimes
+        not RefreshToken.is_revoked,  # <-- CORRIGIDO E712 (para ruff)
+        RefreshToken.expires_at > now_utc_naive,
     )
     result = await db.execute(stmt)
     return result.scalars().first()
+
 
 async def revoke_refresh_token(db: AsyncSession, *, token: str) -> bool:
     """Marca um refresh token como revogado usando seu hash."""
@@ -81,18 +77,20 @@ async def revoke_refresh_token(db: AsyncSession, *, token: str) -> bool:
     result = await db.execute(stmt)
     db_token = result.scalars().first()
 
-    if db_token and not db_token.is_revoked: # Only update if not already revoked
+    if db_token and not db_token.is_revoked:
         db_token.is_revoked = True
         db.add(db_token)
         await db.commit()
         return True
-    return False # Return False if not found or already revoked
+    return False
 
-# ... (revoke_all_refresh_tokens_for_user and prune_expired_tokens remain the same) ...
 
 async def revoke_all_refresh_tokens_for_user(db: AsyncSession, *, user_id: int) -> int:
-    """Revoga todos os refresh tokens de um usuário (ex: ao trocar senha)."""
-    stmt = select(RefreshToken).where(RefreshToken.user_id == user_id, RefreshToken.is_revoked == False)
+    """Revoga todos os refresh tokens de um usuário."""
+    stmt = select(RefreshToken).where(
+        RefreshToken.user_id == user_id,
+        not RefreshToken.is_revoked,  # <-- CORRIGIDO E712 (para ruff)
+    )
     result = await db.execute(stmt)
     tokens = result.scalars().all()
     count = 0
@@ -104,15 +102,13 @@ async def revoke_all_refresh_tokens_for_user(db: AsyncSession, *, user_id: int) 
         await db.commit()
     return count
 
+
 async def prune_expired_tokens(db: AsyncSession) -> int:
-    """Remove tokens expirados do banco (pode ser rodado periodicamente)."""
+    """Remove tokens expirados do banco."""
     now_utc_naive = datetime.now(timezone.utc).replace(tzinfo=None)
     stmt = delete(RefreshToken).where(RefreshToken.expires_at <= now_utc_naive)
-    result = await db.execute(stmt)
+    result: Result = await db.execute(stmt)  # Adicionar type hint para Result
     await db.commit()
-    return result.rowcount # Número de linhas deletadas
-
-# Add IntegrityError to imports if not already there
-from sqlalchemy.exc import IntegrityError
-from fastapi import HTTPException
-from typing import Optional # Add Optional if needed at top
+    # CORRIGIDO: Acessar rowcount
+    row_count = result.rowcount # Número de linhas deletadas  # type: ignore [attr-defined]
+    return row_count if row_count is not None else 0  # rowcount pode ser None

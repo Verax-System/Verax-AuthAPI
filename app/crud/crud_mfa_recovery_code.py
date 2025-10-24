@@ -33,9 +33,10 @@ async def create_recovery_codes(
     """
     Apaga códigos antigos, gera novos códigos de recuperação,
     guarda os seus hashes e retorna os códigos em texto simples.
+    (NÃO FAZ COMMIT)
     """
     # 1. Apagar todos os códigos antigos
-    await delete_all_codes_for_user(db, user_id=user.id)
+    await delete_all_codes_for_user(db, user_id=user.id) # Esta função também não deve commitar
 
     # 2. Gerar novos códigos em texto simples
     plain_codes = generate_plain_recovery_codes()
@@ -52,22 +53,20 @@ async def create_recovery_codes(
             )
         )
     
-    # 4. Adicionar à sessão e fazer commit
+    # 4. Adicionar à sessão
     db.add_all(db_codes)
-    await db.commit()
+    # await db.commit() # <-- REMOVIDO
     
-    logger.info(f"Gerados {len(plain_codes)} novos códigos de recuperação para o user ID {user.id}")
+    logger.info(f"Gerados {len(plain_codes)} novos códigos de recuperação para o user ID {user.id} (pendente de commit)")
     
     # 5. Retornar os códigos em texto simples (para mostrar ao utilizador)
     return plain_codes
 
 async def delete_all_codes_for_user(db: AsyncSession, *, user_id: int) -> int:
-    """Apaga todos os códigos de recuperação de um utilizador (ex: ao desativar MFA)."""
+    """Apaga todos os códigos de recuperação de um utilizador (NÃO FAZ COMMIT)."""
     stmt = delete(MFARecoveryCode).where(MFARecoveryCode.user_id == user_id)
     result = await db.execute(stmt)
-    # Não precisa de commit() aqui se for chamado por outra função que faz commit
-    # Mas se for chamado sozinho, precisa. Adicionamos por segurança.
-    await db.commit() 
+    # await db.commit() # <-- REMOVIDO
     return result.rowcount
 
 async def get_valid_recovery_code(

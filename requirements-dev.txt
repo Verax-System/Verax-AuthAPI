@@ -7,3 +7,8 @@ safety
 pytest-cov
 pytest-asyncio  
 aiosqlite
+types-passlib   
+types-python-jose
+respx
+pyotp        # <-- ADICIONADO (para test_03_mfa_flows.py)
+pytest-mock
