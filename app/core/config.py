@@ -10,6 +10,9 @@ ENV_FILE_PATH = BASE_DIR / ".env"
 
 class Settings(BaseSettings):
 
+    TRUSTED_DEVICE_COOKIE_NAME: str = "auth_device_id"
+    TRUSTED_DEVICE_COOKIE_MAX_AGE_DAYS: int = 30 # Tempo que o dispositivo será lembrado
+
     # Core
     DATABASE_URL: str
     SECRET_KEY: str

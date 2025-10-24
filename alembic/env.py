@@ -21,6 +21,7 @@ from app.models import user # noqa F401
 from app.models import refresh_token # noqa F401
 # --- ADICIONAR NOVO MODELO ---
 from app.models import mfa_recovery_code # noqa F401
+from app.models import trusted_device # noqa F401 <-- ADICIONE ESTA LINHA
 # --- FIM ADIÇÃO ---
 # --- Fim Importar Modelos ---
 

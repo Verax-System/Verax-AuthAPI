@@ -3,7 +3,7 @@ from sqlalchemy import String, DateTime, func, Boolean, Integer, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from datetime import datetime
 from typing import Optional, List 
-
+from .trusted_device import TrustedDevice # <-- ADICIONAR IMPORT
 from app.db.base import Base
 from app.models.mfa_recovery_code import MFARecoveryCode # type: ignore
 
@@ -50,5 +50,10 @@ class User(Base):
     recovery_codes: Mapped[List["MFARecoveryCode"]] = relationship(
         back_populates="user", 
         cascade="all, delete-orphan" 
+    )
+
+    trusted_devices: Mapped[List["TrustedDevice"]] = relationship( # <-- ADICIONAR RELAÇÃO
+        back_populates="user",
+        cascade="all, delete-orphan"
     )
     # --- FIM RELAÇÃO ---
