@@ -11,6 +11,7 @@ logs/
 env
 .env
 ./env
+
 # IDEs
 .idea/
 .vscode/
@@ -18,3 +19,7 @@ env
 # OS
 .DS_Store
 Thumbs.db
+
+# Chaves Criptográficas e Segredos
+*.pem
+*.json

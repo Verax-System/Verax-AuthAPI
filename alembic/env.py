@@ -23,6 +23,9 @@ from app.models import refresh_token # noqa F401
 from app.models import mfa_recovery_code # noqa F401
 from app.models import trusted_device # noqa F401 <-- ADICIONE ESTA LINHA
 # --- FIM ADIÇÃO ---
+from app.models import oauth2_client # noqa F401 <-- ADICIONE ESTA LINHA
+from app.models import oauth2_authorization_code # noqa F401 <-- ADICIONE ESTA LINHA
+# ...
 # --- Fim Importar Modelos ---
 
 
