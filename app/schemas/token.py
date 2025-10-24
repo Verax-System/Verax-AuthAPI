@@ -1,6 +1,7 @@
 # auth_api/app/schemas/token.py
 from pydantic import BaseModel
 from typing import Literal, List, Optional
+from datetime import datetime # <-- ADICIONAR datetime
 
 class Token(BaseModel):
     access_token: str
@@ -35,3 +36,14 @@ class GoogleLoginRequest(BaseModel):
 # --- FIM ADIÇÃO ---
 
 # --- FIM NOVOS SCHEMAS ---
+
+class SessionInfo(BaseModel):
+    """Informações sobre uma sessão de login ativa (um refresh token)."""
+    id: int
+    user_agent: Optional[str]
+    ip_address: Optional[str]
+    created_at: datetime
+    expires_at: datetime
+
+    class Config:
+        from_attributes = True # Permite mapear diretamente do modelo SQLAlchemy

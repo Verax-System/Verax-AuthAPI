@@ -1,9 +1,9 @@
 # auth_api/app/api/endpoints/auth.py
 from loguru import logger
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Union
+from typing import Any, Dict, Union, List, Optional # 1. ADICIONAR List, Optional
 from app.crud import crud_refresh_token
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request # 2. ADICIONAR Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.dependencies import get_current_active_user, get_db
@@ -14,7 +14,8 @@ from app.core import security
 from app.core.config import settings
 from app.schemas.token import (
     Token, RefreshTokenRequest, MFARequiredResponse,
-    GoogleLoginUrlResponse, GoogleLoginRequest # <-- RE-ADICIONADO
+    GoogleLoginUrlResponse, GoogleLoginRequest,
+    SessionInfo # 3. ADICIONAR SessionInfo
 )
 from app.schemas.user import User as UserSchema
 from app.models.user import User as UserModel
@@ -40,8 +41,7 @@ GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 # ---------------------------------
 
-# (Código existente das constantes e helpers do MFA - sem alterações)
-# ... (O código MFA/JWT helpers permanece o mesmo) ...
+# (Constantes e helpers MFA - permanecem os mesmos)
 MFA_CHALLENGE_SECRET_KEY = settings.SECRET_KEY + "-mfa-challenge" 
 MFA_CHALLENGE_ALGORITHM = settings.ALGORITHM
 MFA_CHALLENGE_EXPIRE_MINUTES = 5 
@@ -75,10 +75,16 @@ def decode_mfa_challenge_token(token: str) -> Dict | None:
     except JWTError as e:
         logger.warning(f"Erro ao decodificar challenge token MFA: {e}")
         return None
-# (Fim do código existente do MFA)
+
+# --- 4. FUNÇÃO HELPER PARA OBTER INFO DA SESSÃO ---
+def get_session_details(request: Request) -> Dict[str, Optional[str]]:
+    """Extrai IP e User-Agent do request."""
+    ip_address = request.client.host
+    user_agent = request.headers.get("user-agent")
+    return {"ip_address": ip_address, "user_agent": user_agent}
+# --- FIM HELPER ---
 
 
-# --- Endpoint /token (EXISTENTE - sem alterações) ---
 @router.post(
     "/token",
     response_model=Union[Token, MFARequiredResponse], 
@@ -88,11 +94,11 @@ def decode_mfa_challenge_token(token: str) -> Dict | None:
     }
 )
 async def login_for_access_token(
+    request: Request, # <-- 5. ADICIONAR Request
     db: AsyncSession = Depends(get_db),
     form_data: OAuth2PasswordRequestForm = Depends(),
     response: Response = Response() 
 ) -> Any:
-    # (Código existente - sem alterações)
     try:
         user = await crud_user.authenticate(db, email=form_data.username, password=form_data.password)
     except AccountLockedException as e:
@@ -126,9 +132,18 @@ async def login_for_access_token(
     refresh_token_str, expires_at = security.create_refresh_token(
         data={"sub": str(user.id)}
     )
+    
+    # --- 6. ADICIONAR IP/UA ---
+    session_details = get_session_details(request)
     await crud_refresh_token.create_refresh_token(
-        db, user=user, token=refresh_token_str, expires_at=expires_at
+        db, 
+        user=user, 
+        token=refresh_token_str, 
+        expires_at=expires_at,
+        ip_address=session_details.get("ip_address"),
+        user_agent=session_details.get("user_agent")
     )
+    
     response.status_code = status.HTTP_200_OK
     return Token(
         access_token=access_token,
@@ -136,44 +151,36 @@ async def login_for_access_token(
         token_type="bearer"
     )
 
-# --- ENDPOINTS GOOGLE OAUTH REVERTIDOS PARA PRODUÇÃO ---
+# --- Endpoints Google OAuth ---
 
 @router.get("/google/login-url", response_model=GoogleLoginUrlResponse)
 async def get_google_login_url():
-    """
-    Retorna o URL de autorização da Google para o frontend.
-    O frontend deve redirecionar o utilizador para este URL.
-    """
-    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_REDIRECT_URI_FRONTEND: # MODIFICADO
+    # (Sem alterações aqui)
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_REDIRECT_URI_FRONTEND:
         logger.error("GOOGLE_CLIENT_ID ou GOOGLE_REDIRECT_URI_FRONTEND não estão configurados no .env")
         raise HTTPException(status_code=500, detail="Configuração OAuth está incompleta.")
 
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
-        "redirect_uri": settings.GOOGLE_REDIRECT_URI_FRONTEND, # MODIFICADO
+        "redirect_uri": settings.GOOGLE_REDIRECT_URI_FRONTEND,
         "response_type": "code",
         "scope": "openid email profile", 
         "access_type": "offline",      
         "prompt": "select_account",    
     }
     
-    request = httpx.Request("GET", GOOGLE_AUTH_URL, params=params)
-    return GoogleLoginUrlResponse(url=str(request.url))
+    request_obj = httpx.Request("GET", GOOGLE_AUTH_URL, params=params)
+    return GoogleLoginUrlResponse(url=str(request_obj.url))
 
-@router.post("/google/callback", response_model=Token) # MODIFICADO: De GET para POST
+@router.post("/google/callback", response_model=Token)
 async def google_callback(
+    request: Request, # <-- 5. ADICIONAR Request
     *,
     db: AsyncSession = Depends(get_db),
-    login_request: GoogleLoginRequest # MODIFICADO: Recebe JSON do frontend
+    login_request: GoogleLoginRequest 
 ):
-    """
-    Endpoint de callback para o login Google.
-    O frontend recebe o 'code' da Google, envia para este endpoint.
-    A API troca o 'code' por info do utilizador, cria/encontra o utilizador,
-    e retorna os tokens JWT da *nossa* API.
-    """
-    code = login_request.code # MODIFICADO
-    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET or not settings.GOOGLE_REDIRECT_URI_FRONTEND: # MODIFICADO
+    code = login_request.code 
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET or not settings.GOOGLE_REDIRECT_URI_FRONTEND:
         logger.error("Configurações OAuth da Google incompletas.")
         raise HTTPException(status_code=500, detail="Configuração OAuth está incompleta.")
 
@@ -182,7 +189,7 @@ async def google_callback(
         "code": code,
         "client_id": settings.GOOGLE_CLIENT_ID,
         "client_secret": settings.GOOGLE_CLIENT_SECRET,
-        "redirect_uri": settings.GOOGLE_REDIRECT_URI_FRONTEND, # MODIFICADO
+        "redirect_uri": settings.GOOGLE_REDIRECT_URI_FRONTEND,
         "grant_type": "authorization_code",
     }
     
@@ -238,8 +245,16 @@ async def google_callback(
     logger.info(f"Login OAuth bem-sucedido para {user.email}. Emitindo tokens.")
     access_token = security.create_access_token(user=user, mfa_passed=True) 
     refresh_token_str, expires_at = security.create_refresh_token(data={"sub": str(user.id)})
+    
+    # --- 6. ADICIONAR IP/UA ---
+    session_details = get_session_details(request)
     await crud_refresh_token.create_refresh_token(
-        db, user=user, token=refresh_token_str, expires_at=expires_at
+        db, 
+        user=user, 
+        token=refresh_token_str, 
+        expires_at=expires_at,
+        ip_address=session_details.get("ip_address"),
+        user_agent=session_details.get("user_agent")
     )
     
     return Token(
@@ -248,17 +263,13 @@ async def google_callback(
         token_type="bearer"
     )
 
-# --- FIM ENDPOINTS GOOGLE OAUTH ---
-
-
-# --- Endpoints MFA (EXISTENTES - sem alterações) ---
-# (O resto do ficheiro auth.py permanece o mesmo)
+# --- Endpoints MFA ---
 @router.post("/mfa/enable", response_model=MFAEnableResponse)
 async def enable_mfa_start(
     current_user: UserModel = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    # (Código existente - sem alterações)
+    # (Sem alterações aqui)
     if current_user.is_mfa_enabled:
         raise HTTPException(status_code=400, detail="MFA já está habilitado.")
     otp_secret = security.generate_otp_secret()
@@ -272,7 +283,7 @@ async def enable_mfa_start(
     otp_uri = security.generate_otp_uri(
         secret=otp_secret,
         email=current_user.email,
-        issuer_name=settings.EMAIL_FROM_NAME or "Verax"
+        issuer_name=settings.EMAIL_FROM_NAME or "Verax Auth"
     )
     try:
         qr_code_base64 = security.generate_qr_code_base64(otp_uri)
@@ -292,7 +303,7 @@ async def enable_mfa_confirm(
     mfa_data: MFAConfirmRequest,
     current_user: UserModel = Depends(get_current_active_user)
 ):
-    # (Código existente - sem alterações)
+    # (Sem alterações aqui)
     if current_user.is_mfa_enabled:
         raise HTTPException(status_code=400, detail="MFA já está habilitado.")
 
@@ -320,7 +331,7 @@ async def disable_mfa(
     mfa_data: MFADisableRequest,
     current_user: UserModel = Depends(get_current_active_user)
 ):
-    # (Código existente - sem alterações)
+    # (Sem alterações aqui)
     if not current_user.is_mfa_enabled:
         raise HTTPException(status_code=400, detail="MFA não está habilitado.")
 
@@ -336,11 +347,11 @@ async def disable_mfa(
 
 @router.post("/mfa/verify", response_model=Token)
 async def verify_mfa_login(
+    request: Request, # <-- 5. ADICIONAR Request
     *,
     db: AsyncSession = Depends(get_db),
     mfa_data: MFAVerifyRequest
 ):
-    # (Código existente - sem alterações)
     payload = decode_mfa_challenge_token(mfa_data.mfa_challenge_token)
     if not payload:
         raise HTTPException(status_code=400, detail="Token de desafio MFA inválido ou expirado.")
@@ -364,9 +375,17 @@ async def verify_mfa_login(
     access_token = security.create_access_token(user=user, mfa_passed=True)
     refresh_token_str, expires_at = security.create_refresh_token(data={"sub": str(user.id)})
 
+    # --- 6. ADICIONAR IP/UA ---
+    session_details = get_session_details(request)
     await crud_refresh_token.create_refresh_token(
-        db, user=user, token=refresh_token_str, expires_at=expires_at
+        db, 
+        user=user, 
+        token=refresh_token_str, 
+        expires_at=expires_at,
+        ip_address=session_details.get("ip_address"),
+        user_agent=session_details.get("user_agent")
     )
+    
     return Token(
         access_token=access_token,
         refresh_token=refresh_token_str,
@@ -375,11 +394,11 @@ async def verify_mfa_login(
 
 @router.post("/mfa/verify-recovery", response_model=Token)
 async def verify_mfa_recovery_login(
+    request: Request, # <-- 5. ADICIONAR Request
     *,
     db: AsyncSession = Depends(get_db),
     mfa_data: MFARecoveryRequest
 ):
-    # (Código existente - sem alterações)
     payload = decode_mfa_challenge_token(mfa_data.mfa_challenge_token)
     if not payload:
         raise HTTPException(status_code=400, detail="Token de desafio MFA inválido ou expirado.")
@@ -398,7 +417,7 @@ async def verify_mfa_recovery_login(
     db_code = await crud_mfa_recovery_code.get_valid_recovery_code(
         db=db, 
         user=user, 
-plain_code=mfa_data.recovery_code
+        plain_code=mfa_data.recovery_code
     )
     
     if not db_code:
@@ -411,42 +430,77 @@ plain_code=mfa_data.recovery_code
     access_token = security.create_access_token(user=user, mfa_passed=True)
     refresh_token_str, expires_at = security.create_refresh_token(data={"sub": str(user.id)})
 
+    # --- 6. ADICIONAR IP/UA ---
+    session_details = get_session_details(request)
     await crud_refresh_token.create_refresh_token(
-        db, user=user, token=refresh_token_str, expires_at=expires_at
+        db, 
+        user=user, 
+        token=refresh_token_str, 
+        expires_at=expires_at,
+        ip_address=session_details.get("ip_address"),
+        user_agent=session_details.get("user_agent")
     )
+    
     return Token(
         access_token=access_token,
         refresh_token=refresh_token_str,
         token_type="bearer"
     )
 
-# --- FIM NOVOS ENDPOINTS MFA ---
-
-
 # --- ENDPOINTS EXISTENTES (/refresh, /verify-email, etc.) ---
-# (O resto do ficheiro permanece o mesmo)
 @router.post("/refresh", response_model=Token)
-async def refresh_access_token(*, db: AsyncSession = Depends(get_db), refresh_request: RefreshTokenRequest) -> Any:
+async def refresh_access_token(
+    request: Request, # <-- 5. ADICIONAR Request
+    *, 
+    db: AsyncSession = Depends(get_db), 
+    refresh_request: RefreshTokenRequest
+) -> Any:
     refresh_token_str = refresh_request.refresh_token
     credentials_exception = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials", headers={"WWW-Authenticate": "Bearer"})
+    
     payload = security.decode_refresh_token(refresh_token_str)
     if payload is None: raise credentials_exception
+    
     user_id_str = payload.get("sub")
     if user_id_str is None: raise credentials_exception
+    
     try: user_id = int(user_id_str)
     except ValueError: raise credentials_exception
+    
     db_refresh_token = await crud_refresh_token.get_refresh_token(db, token=refresh_token_str)
-    if not db_refresh_token or db_refresh_token.user_id != user_id: raise credentials_exception
+    if not db_refresh_token or db_refresh_token.user_id != user_id: 
+        raise credentials_exception
+        
+    # Revogar o token antigo
     await crud_refresh_token.revoke_refresh_token(db, token=refresh_token_str)
+    
     user = await crud_user.get(db, id=user_id)
     if not user or not user.is_active: raise credentials_exception
+    
+    # Criar novos tokens
     new_access_token = security.create_access_token(user=user, mfa_passed=False)
     new_refresh_token_str, new_expires_at = security.create_refresh_token(data={"sub": str(user.id)})
-    await crud_refresh_token.create_refresh_token(db, user=user, token=new_refresh_token_str, expires_at=new_expires_at)
-    return Token(access_token=new_access_token, refresh_token=new_refresh_token_str, token_type="bearer")
+    
+    # --- 6. ADICIONAR IP/UA ---
+    session_details = get_session_details(request)
+    await crud_refresh_token.create_refresh_token(
+        db, 
+        user=user, 
+        token=new_refresh_token_str, 
+        expires_at=new_expires_at,
+        ip_address=session_details.get("ip_address"),
+        user_agent=session_details.get("user_agent")
+    )
+    
+    return Token(
+        access_token=new_access_token, 
+        refresh_token=new_refresh_token_str, 
+        token_type="bearer"
+    )
 
 @router.get("/verify-email/{token}", response_model=UserSchema)
 async def verify_email(*, db: AsyncSession = Depends(get_db), token: str = Path(...)):
+    # (Sem alterações aqui)
     user = await crud_user.verify_user_email(db, token=token)
     if not user: raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token de verificação inválido ou expirado")
     logger.info(f"Email verificado com sucesso para usuário ID: {user.id}")
@@ -454,15 +508,18 @@ async def verify_email(*, db: AsyncSession = Depends(get_db), token: str = Path(
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(*, db: AsyncSession = Depends(get_db), refresh_request: RefreshTokenRequest):
+    # (Sem alterações aqui - este endpoint agora desloga apenas a sessão atual)
     await crud_refresh_token.revoke_refresh_token(db, token=refresh_request.refresh_token)
     return None
 
 @router.get("/me", response_model=UserSchema)
 async def read_users_me(current_user: UserModel = Depends(get_current_active_user)) -> Any:
+    # (Sem alterações aqui)
     return current_user
 
 @router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED)
 async def forgot_password(*, db: AsyncSession = Depends(get_db), request_body: ForgotPasswordRequest, background_tasks: BackgroundTasks):
+    # (Sem alterações aqui)
     user = await crud_user.get_by_email(db, email=request_body.email)
     if user and user.is_active:
         try:
@@ -477,6 +534,7 @@ async def forgot_password(*, db: AsyncSession = Depends(get_db), request_body: F
 
 @router.post("/reset-password", response_model=UserSchema)
 async def reset_password(*, db: AsyncSession = Depends(get_db), request_body: ResetPasswordRequest):
+    # (Sem alterações aqui)
     token = request_body.token
     new_password = request_body.new_password
     payload = security.decode_password_reset_token(token)
@@ -492,3 +550,87 @@ async def reset_password(*, db: AsyncSession = Depends(get_db), request_body: Re
         logger.error(f"Erro ao tentar redefinir a senha para {user.email}: {e}")
         await db.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Ocorreu um erro ao atualizar sua senha.")
+
+# --- 7. NOVOS ENDPOINTS DE GESTÃO DE SESSÃO ---
+
+@router.get("/sessions", response_model=List[SessionInfo])
+async def get_active_sessions(
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_active_user)
+):
+    """
+    Lista todas as sessões de login ativas (refresh tokens válidos)
+    para o usuário autenticado.
+    """
+    sessions = await crud_refresh_token.get_active_sessions_for_user(
+        db, user_id=current_user.id
+    )
+    return sessions
+
+@router.delete("/sessions/all", status_code=status.HTTP_204_NO_CONTENT)
+async def logout_all_sessions(
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_active_user)
+):
+    """
+    Desconecta TODAS as sessões do usuário, revogando todos os refresh tokens
+    (incluindo o da sessão atual).
+    """
+    revoked_count = await crud_refresh_token.revoke_all_refresh_tokens_for_user(
+        db, user_id=current_user.id, exclude_token_hash=None
+    )
+    logger.info(f"Usuário {current_user.email} revogou todas as {revoked_count} sessões.")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+@router.post("/sessions/all-except-current", status_code=status.HTTP_204_NO_CONTENT)
+async def logout_all_except_current_session(
+    refresh_request: RefreshTokenRequest, # Token atual no body
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_active_user)
+):
+    """
+    Desconecta todas as sessões do usuário, EXCETO a sessão atual
+    (identificada pelo refresh token enviado no corpo).
+    """
+    try:
+        token_hash_to_exclude = crud_refresh_token.hash_token(refresh_request.refresh_token)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid refresh token format")
+
+    # Verifica se o token a excluir é válido e pertence ao usuário
+    sessions = await crud_refresh_token.get_active_sessions_for_user(db, user_id=current_user.id)
+    if not any(s.token_hash == token_hash_to_exclude for s in sessions):
+        raise HTTPException(status_code=403, detail="Refresh token not found or invalid for this user")
+
+    revoked_count = await crud_refresh_token.revoke_all_refresh_tokens_for_user(
+        db, user_id=current_user.id, exclude_token_hash=token_hash_to_exclude
+    )
+    logger.info(f"Usuário {current_user.email} revogou {revoked_count} outras sessões.")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def logout_specific_session(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_active_user)
+):
+    """
+    Desconecta uma sessão específica (revoga um refresh token)
+    pelo seu ID numérico.
+    """
+    db_token = await crud_refresh_token.get_refresh_token_by_id(
+        db, token_id=session_id, user_id=current_user.id
+    )
+    
+    if not db_token:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sessão não encontrada ou não pertence a este usuário."
+        )
+    
+    await crud_refresh_token.revoke_refresh_token_by_id(db, db_token=db_token)
+    logger.info(f"Usuário {current_user.email} revogou a sessão ID {session_id}.")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+# --- FIM NOVOS ENDPOINTS ---
