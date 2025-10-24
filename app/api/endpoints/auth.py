@@ -272,7 +272,7 @@ async def enable_mfa_start(
     otp_uri = security.generate_otp_uri(
         secret=otp_secret,
         email=current_user.email,
-        issuer_name=settings.EMAIL_FROM_NAME or "Verax Auth"
+        issuer_name=settings.EMAIL_FROM_NAME or "Verax"
     )
     try:
         qr_code_base64 = security.generate_qr_code_base64(otp_uri)

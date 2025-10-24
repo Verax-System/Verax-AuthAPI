@@ -8,7 +8,7 @@
   </a>
 </p>
 
-# Verax AuthAPI
+# Verax
 
 Um serviço de identidade agnóstico, seguro e flexível. Construído com FastAPI e PostgreSQL para servir como um provedor de identidade (IdP) centralizado para qualquer aplicação.
 

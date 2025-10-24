@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     # --- Configurações de Email (SendGrid) ---
     BREVO_API_KEY: str # Substitua SENDGRID_API_KEY por esta linha
     EMAIL_FROM: EmailStr
-    EMAIL_FROM_NAME: str | None = "Verax AuthAPI"
+    EMAIL_FROM_NAME: str | None = "Verax"
 
     # Email Links
     VERIFICATION_URL_BASE: str = "http://localhost:8000/verify"
