@@ -1,8 +1,8 @@
 """empty message
 
-Revision ID: cc0065610539
+Revision ID: 08425a8eb55f
 Revises: 
-Create Date: 2025-10-23 15:41:17.784281
+Create Date: 2025-10-24 07:43:08.911551
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'cc0065610539'
+revision: str = '08425a8eb55f'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -24,7 +24,7 @@ def upgrade() -> None:
     op.create_table('users',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('email', sa.String(length=100), nullable=False),
-    sa.Column('hashed_password', sa.String(length=255), nullable=False),
+    sa.Column('hashed_password', sa.String(length=255), nullable=True),
     sa.Column('full_name', sa.String(length=150), nullable=True),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('is_verified', sa.Boolean(), nullable=False),
@@ -45,6 +45,17 @@ def upgrade() -> None:
     op.create_index(op.f('ix_users_id'), 'users', ['id'], unique=False)
     op.create_index(op.f('ix_users_reset_password_token_hash'), 'users', ['reset_password_token_hash'], unique=False)
     op.create_index(op.f('ix_users_verification_token_hash'), 'users', ['verification_token_hash'], unique=False)
+    op.create_table('mfa_recovery_codes',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('hashed_code', sa.String(length=255), nullable=False),
+    sa.Column('is_used', sa.Boolean(), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('ix_mfa_recovery_codes_hashed_code', 'mfa_recovery_codes', ['hashed_code'], unique=True)
+    op.create_index(op.f('ix_mfa_recovery_codes_id'), 'mfa_recovery_codes', ['id'], unique=False)
+    op.create_index('ix_mfa_recovery_codes_user_id', 'mfa_recovery_codes', ['user_id'], unique=False)
     op.create_table('refresh_tokens',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
@@ -68,6 +79,10 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_refresh_tokens_token_hash'), table_name='refresh_tokens')
     op.drop_index(op.f('ix_refresh_tokens_id'), table_name='refresh_tokens')
     op.drop_table('refresh_tokens')
+    op.drop_index('ix_mfa_recovery_codes_user_id', table_name='mfa_recovery_codes')
+    op.drop_index(op.f('ix_mfa_recovery_codes_id'), table_name='mfa_recovery_codes')
+    op.drop_index('ix_mfa_recovery_codes_hashed_code', table_name='mfa_recovery_codes')
+    op.drop_table('mfa_recovery_codes')
     op.drop_index(op.f('ix_users_verification_token_hash'), table_name='users')
     op.drop_index(op.f('ix_users_reset_password_token_hash'), table_name='users')
     op.drop_index(op.f('ix_users_id'), table_name='users')

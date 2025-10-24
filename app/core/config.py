@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # --- Configurações de Email (SendGrid) ---
-    SENDGRID_API_KEY: str
+    BREVO_API_KEY: str # Substitua SENDGRID_API_KEY por esta linha
     EMAIL_FROM: EmailStr
     EMAIL_FROM_NAME: str | None = "Verax AuthAPI"
 

@@ -3,82 +3,86 @@ import asyncio
 import traceback
 from typing import Dict, Any
 from loguru import logger
-from sendgrid.helpers.mail import Mail, From, To, Content
 from app.core.config import settings
 
-# --- NOVAS IMPORTAÇÕES ---
+# --- NOVAS IMPORTAÇÕES (httpx e certifi já devem estar lá) ---
 import httpx
 import certifi
 # --- FIM NOVAS IMPORTAÇÕES ---
 
-# URL da API SendGrid
-SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send"
+# --- MUDANÇA 1: URL da API da Brevo ---
+BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
 
-# Helper assíncrono REESCRITO para usar HTTpx
+# Helper assíncrono REESCRITO para usar HTTpx para a Brevo
 async def send_email_http_api(
     email_to: str,
     subject: str,
     html_content: str
 ) -> bool:
     """
-    Envia um email usando HTTpx manualmente, o que lida melhor
-    com certificados SSL (usando 'certifi').
+    Envia um email usando HTTpx manualmente para a API da Brevo.
     """
-    if not settings.SENDGRID_API_KEY:
-        logger.error("SENDGRID_API_KEY não está configurada. Email não será enviado.")
+    # --- MUDANÇA 2: Verificar a nova API Key ---
+    if not settings.BREVO_API_KEY:
+        logger.error("BREVO_API_KEY não está configurada. Email não será enviado.")
         return False
 
-    # 1. Usar a biblioteca sendgrid apenas para construir o payload
-    message = Mail(
-        from_email=From(settings.EMAIL_FROM, settings.EMAIL_FROM_NAME),
-        to_emails=To(email_to),
-        subject=subject,
-        html_content=Content("text/html", html_content)
-    )
-    # Obter o payload JSON que a biblioteca sendgrid teria enviado
-    message_payload = message.get()
+    # --- MUDANÇA 3: Novo formato de Payload (JSON simples da Brevo) ---
+    # Isto substitui a necessidade da biblioteca 'sendgrid.helpers.mail'
+    message_payload = {
+        "sender": {
+            "name": settings.EMAIL_FROM_NAME or "Verax AuthAPI",
+            "email": settings.EMAIL_FROM
+        },
+        "to": [
+            {"email": email_to}
+        ],
+        "subject": subject,
+        "htmlContent": html_content
+    }
 
-    # 2. Preparar a requisição manual com httpx
+    # --- MUDANÇA 4: Novo formato de Header (api-key) ---
     headers = {
-        "Authorization": f"Bearer {settings.SENDGRID_API_KEY}",
-        "Content-Type": "application/json"
+        "api-key": settings.BREVO_API_KEY, # Autenticação da Brevo
+        "Content-Type": "application/json",
+        "Accept": "application/json"
     }
 
     try:
-        # 3. Criar um transporte que USA EXPLICITAMENTE os certificados do certifi
-        # Esta é a correção definitiva para [SSL: CERTIFICATE_VERIFY_FAILED]
+        # 3. O transporte HTTpx permanece o mesmo (isto é bom!)
         transport = httpx.AsyncHTTPTransport(verify=certifi.where())
         
         async with httpx.AsyncClient(transport=transport) as client:
-            logger.info(f"Enviando email para {email_to} via HTTpx (com certifi)...")
+            logger.info(f"Enviando email para {email_to} via Brevo (HTTpx)...")
             response = await client.post(
-                SENDGRID_API_URL,
+                BREVO_API_URL, # Mudar para o URL da Brevo
                 json=message_payload,
                 headers=headers
             )
 
-        # 4. Processar a resposta do httpx
-        # A API v3 do SendGrid retorna 202 Accepted em caso de sucesso
+        # --- MUDANÇA 5: Processar a resposta da Brevo (201 Created) ---
+        # A API v3 da Brevo retorna 201 Created em caso de sucesso
         if 200 <= response.status_code < 300:
-            logger.info(f"Email aceito para envio para {email_to} via SendGrid. Status: {response.status_code}")
+            logger.info(f"Email aceito para envio para {email_to} via Brevo. Status: {response.status_code}")
             return True
         else:
-            logger.error(f"Falha ao enviar email para {email_to} via HTTpx.")
+            logger.error(f"Falha ao enviar email para {email_to} via Brevo (HTTpx).")
             logger.error(f"Status: {response.status_code}")
             logger.error(f"Body: {response.text}") # Usar .text para httpx
             return False
 
     except httpx.ConnectError as e:
-        logger.error(f"Erro de conexão SSL/TLS ao enviar email para {email_to}: {e}")
-        logger.error("Isso confirma o problema de SSL. Verifique se 'certifi' está atualizado.")
+        logger.error(f"Erro de conexão SSL/TLS ao enviar email (Brevo) para {email_to}: {e}")
         logger.error(f"Traceback completo: {traceback.format_exc()}")
         return False
     except Exception as e:
-        logger.error(f"Erro CRÍTICO ao enviar email (HTTpx) para {email_to}: {e}")
+        logger.error(f"Erro CRÍTICO ao enviar email (Brevo HTTpx) para {email_to}: {e}")
         logger.error(f"Traceback completo: {traceback.format_exc()}")
         return False
 
 # --- O RESTANTE DO ARQUIVO (FUNÇÕES DE CONTEÚDO) PERMANECE IGUAL ---
+# Estas funções não precisam de mudança, pois elas apenas chamam 
+# a função send_email_http_api (que acabámos de modificar).
 
 # --- Função específica para email de verificação ---
 async def send_verification_email(email_to: str, verification_token: str) -> bool:
