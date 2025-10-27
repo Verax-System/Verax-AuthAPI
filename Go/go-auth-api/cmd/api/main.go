@@ -6,6 +6,7 @@ import (
 	"go-auth-api/internal/handlers"
 	"go-auth-api/internal/middleware"
 	"log"
+	"net/http" // Necessário para http.StatusOK
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -22,13 +23,13 @@ func main() {
 	r := gin.Default()
 
 	// 4. Configurar CORS (similar ao Python)
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000", "http://localhost:5173"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-API-Key"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-	}))
+	// Permitir origens específicas ou usar AllowAllOrigins para desenvolvimento
+	corsConfig := cors.DefaultConfig()
+	corsConfig.AllowOrigins = []string{"http://localhost:3000", "http://localhost:5173", "http://localhost:8000"} // Adicione as origens do seu frontend
+	corsConfig.AllowCredentials = true
+	corsConfig.AllowHeaders = append(corsConfig.AllowHeaders, "Authorization", "X-API-Key") // Garantir que headers customizados são permitidos
+	r.Use(cors.New(corsConfig))
+
 
 	// 5. Definir Rotas
 	apiV1 := r.Group("/api/v1")
@@ -43,16 +44,21 @@ func main() {
 			auth.POST("/mfa/verify", handlers.VerifyMFALogin)
 			auth.POST("/mfa/verify-recovery", handlers.VerifyMFARecoveryLogin)
 			auth.POST("/logout", handlers.Logout)
-			// (Faltando: refresh, forgot-password, reset-password, verify-email)
+			auth.GET("/verify-email/:token", handlers.VerifyEmail) // Rota de verificação
+			auth.POST("/forgot-password", handlers.ForgotPassword) // <-- NOVA ROTA
+			auth.POST("/reset-password", handlers.ResetPassword)
+			auth.POST("/refresh", handlers.RefreshToken) // <-- NOVA ROTA
 
-			// Protegidas (requerem JWT válido)
+			// (Faltando: refresh, forgot-password, reset-password)
+
+			// Protegidas (requerem JWT válido via AuthMiddleware)
 			authProtected := auth.Group("/")
 			authProtected.Use(middleware.AuthMiddleware())
 			{
 				authProtected.GET("/me", handlers.ReadUserMe)
-				// (Faltando: mfa/enable, mfa/confirm, mfa/disable)
-				// (Faltando: sessions, sessions/all, sessions/{id})
-				// (Faltando: devices, devices/{id})
+				authProtected.POST("/mfa/enable", handlers.EnableMFAStart)     // <-- NOVA ROTA PROTEGIDA
+				authProtected.POST("/mfa/confirm", handlers.EnableMFAConfirm)   // <-- NOVA ROTA PROTEGIDA
+				authProtected.POST("/mfa/disable", handlers.DisableMFA)
 			}
 		}
 
@@ -61,28 +67,40 @@ func main() {
 		{
 			// Pública
 			users.POST("/", handlers.CreateUser)
-			
-			// Protegidas por Admin
-			users.GET("/", middleware.AuthMiddleware(), middleware.AdminMiddleware(), handlers.ReadUsers)
-			// (Faltando: GET /{user_id})
+
+			// Protegidas por Admin (AuthMiddleware + AdminMiddleware)
+			adminProtected := users.Group("/")
+			adminProtected.Use(middleware.AuthMiddleware(), middleware.AdminMiddleware())
+			{
+				adminProtected.GET("/", handlers.ReadUsers)
+				adminProtected.GET("/:user_id", handlers.ReadUserByID) // Rota para buscar por ID
+			}
+
+			// Protegidas por Utilizador Logado (Apenas AuthMiddleware)
+			userProtected := users.Group("/")
+			userProtected.Use(middleware.AuthMiddleware())
+			{
+				userProtected.PUT("/me", handlers.UpdateUserMe) // Rota para atualizar próprio utilizador
+			}
 		}
-		
-		// --- Management Routes (Protegidas por API Key) ---
+
+		// --- Management Routes (Protegidas por API Key via MgmtMiddleware) ---
 		mgmt := apiV1.Group("/mgmt")
 		mgmt.Use(middleware.MgmtMiddleware())
 		{
 			mgmt.PATCH("/users/:user_id_or_email/claims", handlers.UpdateUserClaims)
 		}
 	}
-	
+
+	// Rota Raiz
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "Auth API (Go) is running!"})
 	})
 
-
 	// 6. Rodar o Servidor
-	log.Println("Servidor Go rodando na porta 8001...")
-	if err := r.Run(":8001"); err != nil {
+	port := "8001" // Pode vir da config se desejar
+	log.Printf("Servidor Go rodando na porta %s...", port)
+	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("Falha ao iniciar o servidor: %v", err)
 	}
 }
