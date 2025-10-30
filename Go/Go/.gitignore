@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+*.pyd
+*.db
+*.sqlite3
+venv/
+env/
+logs/
+env
+.env
+./env
+# IDEs
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Go/go-auth-api/.env
+Thumbs.db
